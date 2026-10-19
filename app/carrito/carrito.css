@@ -1,0 +1,220 @@
+.carrito-main {
+    background: #fff;
+    min-height: 100vh;
+    padding: 120px 4em 4em;
+}
+
+.carrito-breadcrumb {
+    display: none;
+}
+
+.carrito-box {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    background: #fff;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.carrito-titulo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: 1.8em;
+}
+
+.carrito-vacio {
+    color: #777;
+    text-align: center;
+    padding: 4em 0;
+}
+
+.carrito-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2em;
+    margin-bottom: 2em;
+}
+
+.carrito-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.carrito-imagen-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: 8px;
+    margin-bottom: 0.8em;
+    background: #f4f4f4;
+}
+
+.carrito-imagen {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.carrito-sin-imagen {
+    background: #eee;
+}
+
+.carrito-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5em;
+    margin-bottom: 0.8em;
+}
+
+.carrito-nombre {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin: 0 0 0.3em;
+}
+
+.carrito-precio {
+    font-size: 0.85rem;
+    margin: 0 0 0.3em;
+    color: #333;
+}
+
+.carrito-detalle {
+    font-size: 0.7rem;
+    margin: 0;
+    color: #888;
+    letter-spacing: 0.03em;
+}
+
+.carrito-heart {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    line-height: 0;
+    flex-shrink: 0;
+}
+
+.carrito-heart img {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.carrito-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 2.6em;
+    background: #000;
+    color: #fff;
+    border-radius: 4px;
+    padding: 0 1.2em;
+}
+
+.carrito-stepper button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0.3em 0.4em;
+}
+
+.carrito-stepper span {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.carrito-resumen-barra {
+    background: #000;
+    color: #fff;
+    border-radius: 6px;
+    padding: 1em 1.5em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1em;
+}
+
+.carrito-resumen-total {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-right: 0.6em;
+}
+
+.carrito-resumen-ahorro {
+    color: #81c784;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 0.4em;
+    margin-right: 1.4em;
+    display: inline-block;
+}
+
+.carrito-resumen-iva {
+    font-size: 0.7rem;
+    color: #bbb;
+}
+
+.carrito-proceder {
+    background: #fff;
+    color: #000;
+    border: none;
+    height: 2.6em;
+    padding: 0 1.6em;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.carrito-proceder:hover {
+    background: #eee;
+}
+
+@media (max-width: 1200px) {
+    .carrito-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .carrito-main {
+        padding: 110px 2em 4em;
+    }
+
+    .carrito-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    .carrito-main {
+        padding: 100px 1.5em 3em;
+    }
+
+    .carrito-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .carrito-resumen-barra {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+}
+
+.carrito-marca {
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.9rem;
+    opacity: 0.7;
+    margin: 0.2em 0;
+}

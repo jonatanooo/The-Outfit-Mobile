@@ -1,0 +1,539 @@
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: #e4e0de;
+    width: 100%;
+}
+
+.admin-content {
+    flex: 1;
+    padding: 32px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+}
+
+.admin-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.admin-top h1 {
+    font-size: 1.8rem;
+    color: #0f0808;
+}
+
+.btn-agregar {
+    background-color: black;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-Entrada-de-stock
+{
+    cursor: pointer;
+}
+
+.btn-agregar:hover {
+    background-color: #333;
+}
+
+
+
+
+.stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background-color: #f5f1f1;
+    border-radius: 12px;
+    padding: 16px 20px;
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    
+}
+
+.stat-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card-activa {
+    outline: 2px solid #333;
+    outline-offset: -2px;
+}
+
+.stat-titulo {
+    font-size: 0.9rem;
+    color: #1a1a1a;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.stat-valor {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/*---------Boton de Quitar Filtro*/
+.filtro-indicador {
+    background: #000000;
+    padding: 8px 14px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+}
+
+.filtro-indicador button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    text-decoration: underline;
+}
+
+/*---------- buscador -------------*/
+.buscador {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #160a0a;
+    color:#0f0808;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+}
+
+.buscador:focus {
+    outline: none;
+    border-color: rgb(22, 13, 13);
+}
+
+/* ----------tabla de productos---------- */
+.tabla-productos {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: rgb(253, 252, 252);
+    border-radius: 10px;
+    overflow: hidden;
+    color :#0f0808;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tabla-productos th {
+    text-align: left;
+    padding: 14px 16px;
+    background-color: #ffffff;
+    font-size: 0.85rem;
+    color: #0f0808;
+    border-bottom: 1px solid #141010;
+}
+
+.tabla-productos td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #1a0d0d;
+    font-size: 0.9rem;
+}
+
+.tabla-productos tr:last-child td {
+    border-bottom: none;
+}
+
+.tabla-productos th:last-child {
+    text-align: left;
+    width: 180px;
+    min-width: 180px;
+}
+
+.tabla-productos td:last-child {
+    text-align: right;
+    width: 180px;
+    min-width: 180px;
+}
+
+.tabla-productos td:last-child > div {
+    justify-content: flex-end;
+}
+
+.sin-stock {
+    color: #d32f2f;
+    font-weight: 600;
+}
+
+.stock-bajo {
+    color: #7007ad;
+    font-weight: 600;
+}
+
+
+/*---------Modales-------------*/
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(53, 45, 45, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+}
+
+.modal-box {
+    background: rgb(248, 247, 247);
+    border-radius: 12px;
+    padding: 32px;
+    width: 600px;
+    max-width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #0f0808;
+    margin-bottom: 16px;
+}
+
+.modal-header h2 {
+    font-family: "Instrument Serif", serif;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: clamp(1.20rem, 0.7vw, 1.25rem);
+    color: black;
+}
+
+
+.modal-header button {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.modal-box label {
+    display: block;
+    font-size: 0.85rem;
+    color: #0f0f0f;
+    margin-top: 12px;
+    margin-bottom: 4px;
+}
+
+.modal-box input,
+.modal-box select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #130c0c;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    
+    color: #0f0808;
+}
+
+.modal-row {
+    display: flex;
+    gap: 10px;
+}
+
+.modal-row > div {
+    flex: 1;
+}
+
+.select-con-boton {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.modal-box input::placeholder {
+    color: #999;
+}
+.select-con-boton select,
+.select-con-boton input {
+    flex: 1;
+}
+
+.select-con-boton button {
+    background: #FFC87C;
+    border: 1px solid #1d0e0e;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+    color: #0f0808;
+}
+
+
+
+.fotos-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.Entrada de stock
+{
+    cursor: pointer;
+}
+
+.fotos-row .foto-box.agregar {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.foto-box {
+    width: 80px;
+    height: 80px;
+    border: 1px dashed #0f0d0d;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: #332f2f;
+    position: relative;
+    cursor: pointer;
+    text-align: center;
+}
+
+.foto-vacia {
+    color: #0c0b0b;
+    background: #fafafa;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.fotos-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+
+
+.foto-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.foto-quitar {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.foto-principal-label {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    right: 2px;
+    background: #fdd;
+    color: #900;
+    font-size: 0.6rem;
+    text-align: center;
+    border-radius: 4px;
+    padding: 1px 0;
+}
+
+.btn-guardar {
+    width: 100%;
+    background: black;
+    color: rgb(236, 228, 228);
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 20px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* ---------- Tabs de Navegación (Inventario vs Historial) ---------- */
+.admin-tabs {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #ccc6c3;
+}
+
+.admin-tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 4px;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease;
+}
+
+.admin-tab-btn:hover {
+    color: #1a1a1a;
+}
+
+.admin-tab-btn.activo {
+    font-weight: 700;
+    color: #0f0808;
+    border-bottom: 3px solid #0f0808;
+    margin-bottom: -2px;
+}
+
+/* ---------- Sobrescrituras para tabla de historial ---------- */
+.tabla-historial th:last-child,
+.tabla-historial td:last-child {
+    text-align: left;
+    width: auto;
+}
+
+.tabla-historial td:last-child > div {
+    justify-content: flex-start;
+}
+
+/* ---------- Badges para movimientos de inventario ---------- */
+.badge-ingreso {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.badge-salida {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 10px;
+}
+
+/* ---------- Badges y acciones de descuento / oferta ---------- */
+.badge-descuento-admin {
+    display: inline-block;
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.btn-accion-descuento {
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease;
+}
+
+.btn-accion-descuento:hover {
+    transform: scale(1.15);
+}
+
+/* ---------- Botones de acciones en la tabla ---------- */
+.acciones-tabla-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.btn-accion-tabla {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    max-width: 36px;
+    max-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-accion-tabla:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(1.1);
+}
+
+.btn-accion-tabla img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    display: block;
+}
+
+.btn-accion-tabla .icono-estado-tabla {
+    font-size: 1.2rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+

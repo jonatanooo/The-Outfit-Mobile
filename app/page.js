@@ -1,0 +1,47 @@
+import './Mainpage.css'
+import CarruselPrendas from '../components/CarruselPrenda.jsx';
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
+import { ID_CATEGORIA_MUJER, ID_CATEGORIA_HOMBRE } from '@/lib/productos'
+
+export default function Home() {
+    return(
+        <>
+        <Header />
+            <main>
+                {/* <!-- section lo ocupamos porque es uan division tematica --> */}
+        <section className="videobanner">
+            <video className="hero-video" autoPlay muted loop playsInline preload="auto">
+                <source src="/Videos/VideoPasarela.mov" type="video/mp4"/>
+            </video>
+        </section>
+
+        <section className="nuevosingresos">
+            <h2>NUEVOS INGRESOS</h2>
+            <CarruselPrendas idGenero={ID_CATEGORIA_MUJER} />
+            <CarruselPrendas idGenero={ID_CATEGORIA_HOMBRE} />
+        </section>
+
+        <section className="promobanner">
+        <div className="bannerfotos">
+            {/* <!-- foto 1 --> */}
+            <div>
+                <a href="#">
+                    <img src="/Fotos/02142004104-a5.jpg" alt="" className="banners"/>
+                </a>
+
+                <a href="">
+                </a>
+            </div> 
+            {/* <!-- foto 2 --> */}
+            <div>
+                <a href="#"><img src="/Fotos/04813802712-a2.jpg" alt="" className="banners"/></a>
+            </div>
+        </div>
+        
+        </section>
+            </main>
+            <Footer />
+        </>
+    )
+}

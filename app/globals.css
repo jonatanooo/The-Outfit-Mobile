@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+/* SKELETON LOADING */
+.skeleton {
+    background: #e0e0e0;
+    background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 4px;
+}
+
+/* GLOBAL SKELETON LOADING */
+.skeleton {
+    background: #e0e0e0;
+    background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+    height: 1.2em;
+    margin-bottom: 0.5em;
+    border-radius: 4px;
+}
+
+/* OFERTAS Y DESCUENTOS EN TARJETAS */
+.badge-oferta-card {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background-color: #c62828;
+    color: #ffffff !important;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 6px;
+    border-radius: 4px;
+    z-index: 2;
+}
+
+.prenda-precios-oferta {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin: 0;
+}
+
+.prenda-precio-original-tachado {
+    font-family: "DM Sans", sans-serif;
+    text-decoration: line-through;
+    color: #888;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.prenda-precio-oferta {
+    font-family: "DM Sans", sans-serif;
+    color: #c62828;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
