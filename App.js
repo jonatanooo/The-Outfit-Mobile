@@ -19,9 +19,10 @@ import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Conexión directa a Firebase Firestore
-import { obtenerNuevosIngresos } from './src/lib/productos';
+import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COLUMN_WIDTH = SCREEN_WIDTH / 2; // Exactamente 2 columnas visibles en pantalla
 
 // Diapositivas para el Carrusel Principal (Hero Banner)
 const HERO_SLIDES = [
@@ -51,20 +52,24 @@ function MainHomeScreen() {
 
   const [activeTab, setActiveTab] = useState('home');
   const [activeSlide, setActiveSlide] = useState(0);
-  const [productos, setProductos] = useState([]);
+
+  // Estados de catálogo de nuevos ingresos separados por género
+  const [productosMujer, setProductosMujer] = useState([]);
+  const [productosHombre, setProductosHombre] = useState([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
   const [favoritos, setFavoritos] = useState({});
 
-  // 1. Consulta a Firebase Firestore para la ropa (Nuevos Ingresos)
+  // 1. Consulta a Firebase Firestore para la ropa (Nuevos Ingresos: Fila 1 Mujer, Fila 2 Hombre)
   useEffect(() => {
     let montado = true;
 
     async function cargarCatalogo() {
       try {
         setCargandoProductos(true);
-        const data = await obtenerNuevosIngresos();
+        const { mujer, hombre } = await obtenerNuevosIngresosPorGenero();
         if (montado) {
-          setProductos(data);
+          setProductosMujer(mujer);
+          setProductosHombre(hombre);
         }
       } catch (err) {
         console.error('Error cargando nuevos ingresos desde Firebase:', err);
@@ -95,6 +100,63 @@ function MainHomeScreen() {
     if (index !== activeSlide && index >= 0 && index < HERO_SLIDES.length) {
       setActiveSlide(index);
     }
+  };
+
+  // Renderizador de cada tarjeta de prenda (fotos pegadas de 50% de ancho sin márgenes)
+  const renderPrendaItem = (item) => {
+    const esFav = Boolean(favoritos[item.id]);
+
+    return (
+      <View key={item.id} style={styles.productCard}>
+        {/* Imagen de la prenda (ocupa todo el ancho de su columna para quedar pegada a la siguiente) */}
+        <View style={styles.productImageContainer}>
+          {item.imagen ? (
+            <Image
+              source={{ uri: item.imagen }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.productImage, styles.imagePlaceholder]}>
+              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Información del producto: Título a la izquierda, precio abajo, corazón a la derecha */}
+        <View style={styles.productDetailsRow}>
+          <View style={styles.productTextCol}>
+            <Text
+              style={styles.productTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.nombre.toUpperCase()}
+            </Text>
+            <Text style={styles.productPrice}>
+              ${Number(item.precio).toFixed(2)}
+            </Text>
+          </View>
+
+          {/* Ícono de corazón a la derecha */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => alternarFavorito(item.id)}
+            style={styles.heartButton}
+          >
+            <Image
+              source={
+                esFav
+                  ? require('./assets/ICONOS/Heart2.png')
+                  : require('./assets/ICONOS/Heart.png')
+              }
+              style={styles.heartIcon}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -168,62 +230,32 @@ function MainHomeScreen() {
               <Text style={styles.loaderText}>Cargando colección...</Text>
             </View>
           ) : (
-            <View style={styles.gridContainer}>
-              {productos.map((item) => {
-                const esFav = Boolean(favoritos[item.id]);
+            <View style={styles.catalogContainer}>
+              {/* FILA 1: Ropa de Mujer (2 columnas visibles, scroll horizontal, fotos pegadas) */}
+              <View style={styles.rowSectionMujer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScrollTrack}
+                  snapToInterval={COLUMN_WIDTH}
+                  decelerationRate="fast"
+                >
+                  {productosMujer.map(renderPrendaItem)}
+                </ScrollView>
+              </View>
 
-                return (
-                  <View key={item.id} style={styles.productCard}>
-                    {/* Imagen de la base de datos */}
-                    <View style={styles.productImageContainer}>
-                      {item.imagen ? (
-                        <Image
-                          source={{ uri: item.imagen }}
-                          style={styles.productImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={[styles.productImage, styles.imagePlaceholder]}>
-                          <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Información del producto: Título, Precio y Corazón */}
-                    <View style={styles.productDetailsRow}>
-                      <View style={styles.productTextCol}>
-                        <Text
-                          style={styles.productTitle}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {item.nombre.toUpperCase()}
-                        </Text>
-                        <Text style={styles.productPrice}>
-                          ${Number(item.precio).toFixed(2)}
-                        </Text>
-                      </View>
-
-                      {/* Ícono de corazón a la derecha */}
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => alternarFavorito(item.id)}
-                        style={styles.heartButton}
-                      >
-                        <Image
-                          source={
-                            esFav
-                              ? require('./assets/ICONOS/Heart2.png')
-                              : require('./assets/ICONOS/Heart.png')
-                          }
-                          style={styles.heartIcon}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
+              {/* FILA 2: Ropa de Hombre (2 columnas visibles, scroll horizontal, fotos pegadas) */}
+              <View style={styles.rowSectionHombre}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScrollTrack}
+                  snapToInterval={COLUMN_WIDTH}
+                  decelerationRate="fast"
+                >
+                  {productosHombre.map(renderPrendaItem)}
+                </ScrollView>
+              </View>
             </View>
           )}
         </View>
@@ -313,8 +345,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const PRODUCT_CARD_WIDTH = (SCREEN_WIDTH - 28) / 2;
 
 const styles = StyleSheet.create({
   mainContainer: {
@@ -416,16 +446,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1D1D1',
   },
 
-  // 3. Sección Nuevos Ingresos
+  // 3. Sección Nuevos Ingresos (Catálogo: 2 filas y 2 columnas con scroll horizontal)
   sectionNuevosIngresos: {
-    paddingHorizontal: 10,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 28,
+    paddingBottom: 16,
+    backgroundColor: '#FFFFFF',
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
-    letterSpacing: 1.8,
+    letterSpacing: 2,
     color: '#000000',
     textAlign: 'center',
     marginBottom: 20,
@@ -441,20 +471,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666666',
   },
-  gridContainer: {
+  catalogContainer: {
+    width: SCREEN_WIDTH,
+  },
+  // Fila 1: Ropa de mujer con separación vertical hacia la fila 2
+  rowSectionMujer: {
+    width: SCREEN_WIDTH,
+    marginBottom: 26, // Espacio claro entre la fila de mujer y la fila de hombre
+  },
+  // Fila 2: Ropa de hombre
+  rowSectionHombre: {
+    width: SCREEN_WIDTH,
+    marginBottom: 10,
+  },
+  horizontalScrollTrack: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 24,
+    paddingHorizontal: 0, // Sin márgenes exteriores para que las fotos queden pegadas
   },
   productCard: {
-    width: PRODUCT_CARD_WIDTH,
+    width: COLUMN_WIDTH, // 2 columnas por pantalla (50% cada una)
+    margin: 0,
+    padding: 0,
   },
   productImageContainer: {
-    width: '100%',
-    height: PRODUCT_CARD_WIDTH * 1.38,
+    width: COLUMN_WIDTH,
+    height: COLUMN_WIDTH * 1.36,
     backgroundColor: '#F4F4F4',
     overflow: 'hidden',
+    margin: 0,
+    padding: 0,
   },
   productImage: {
     width: '100%',
@@ -472,7 +517,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   productTextCol: {
     flex: 1,
@@ -598,4 +645,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
