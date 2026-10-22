@@ -12,6 +12,7 @@ import {
   Platform,
   StatusBar,
   Modal,
+  Alert,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,11 @@ import * as SplashScreen from 'expo-splash-screen';
 
 // Conexión directa a Firebase Firestore
 import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './src/lib/firebaseClient';
+import { buscarPerfil, cerrarSesion } from './src/lib/authService';
+import AuthModal from './src/components/AuthScreens';
+import ProfileModal from './src/components/ProfileScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -61,6 +67,73 @@ function MainHomeScreen() {
   const [favoritosVisible, setFavoritosVisible] = useState(false);
   const [filtroFavoritos, setFiltroFavoritos] = useState('TODOS'); // 'TODOS' | 'MUJER' | 'HOMBRE'
   const [mostrarFiltroOpciones, setMostrarFiltroOpciones] = useState(false);
+
+  // Sesión de usuario (Firebase Auth) y pantalla de acceso: 'login' | 'register' | null
+  const [usuario, setUsuario] = useState(null);
+  const [perfilUsuario, setPerfilUsuario] = useState(null);
+  const [authMode, setAuthMode] = useState(null);
+  const [perfilVisible, setPerfilVisible] = useState(false);
+
+  useEffect(() => {
+    const cancelar = onAuthStateChanged(auth, (u) => {
+      setUsuario(u);
+      if (u) {
+        buscarPerfil(u).then(setPerfilUsuario).catch(() => {});
+      } else {
+        setPerfilUsuario(null);
+      }
+    });
+    return cancelar;
+  }, []);
+
+  // Perfil: si no hay sesión abre el login; si la hay abre la pantalla de perfil
+  const abrirPerfil = () => {
+    setActiveTab('perfil');
+    if (usuario) {
+      setPerfilVisible(true);
+    } else {
+      setAuthMode('login');
+    }
+  };
+
+  const cerrarPerfil = () => {
+    setPerfilVisible(false);
+    setActiveTab('home');
+  };
+
+  // Navegación desde la barra inferior de la pantalla de perfil
+  const navegarDesdePerfil = (tabId) => {
+    if (tabId === 'perfil') return;
+    setPerfilVisible(false);
+    handleTabPress(tabId);
+  };
+
+  const alCerrarSesion = () => {
+    setPerfilVisible(false);
+    setActiveTab('home');
+    cerrarSesion().catch(() => {});
+  };
+
+  const cerrarAuth = () => {
+    setAuthMode(null);
+    setActiveTab('home');
+  };
+
+  // Navegación desde la barra inferior de la pantalla de acceso
+  const navegarDesdeAuth = (tabId) => {
+    if (tabId === 'perfil') return;
+    setAuthMode(null);
+    handleTabPress(tabId);
+  };
+
+  const alAutenticar = (resultado, opciones = {}) => {
+    if (resultado?.perfil) setPerfilUsuario(resultado.perfil);
+    setAuthMode(null);
+    setActiveTab('home');
+    if (opciones.registro) {
+      Alert.alert('¡Cuenta creada!', 'Tu cuenta se creó con éxito. Bienvenido a The Outfit.');
+    }
+  };
 
   // Verifica si un producto específico se encuentra en favoritos
   const esFavorito = (id) => {
@@ -158,6 +231,10 @@ function MainHomeScreen() {
     } else if (tabId === 'menu') {
       if (favoritosVisible) cerrarFavoritos();
       abrirMenu();
+    } else if (tabId === 'perfil') {
+      if (menuVisible) cerrarMenu();
+      if (favoritosVisible) cerrarFavoritos();
+      abrirPerfil();
     } else {
       if (menuVisible) cerrarMenu();
       if (favoritosVisible) cerrarFavoritos();
@@ -792,6 +869,9 @@ function MainHomeScreen() {
                         } else if (tab.id === 'menu') {
                           cerrarDetalleProducto();
                           abrirMenu();
+                        } else if (tab.id === 'perfil') {
+                          cerrarDetalleProducto();
+                          setTimeout(abrirPerfil, 350);
                         } else {
                           setActiveTab(tab.id);
                         }
@@ -840,7 +920,8 @@ function MainHomeScreen() {
               activeOpacity={0.7}
               onPress={() => {
                 cerrarMenu();
-                setActiveTab('perfil');
+                // Espera a que cierre el modal del menú antes de abrir el de acceso
+                setTimeout(abrirPerfil, 350);
               }}
               style={styles.menuShortcutItem}
             >
@@ -950,6 +1031,9 @@ function MainHomeScreen() {
                         irAInicio();
                       } else if (tab.id === 'menu') {
                         // Ya se encuentra en el menú
+                      } else if (tab.id === 'perfil') {
+                        cerrarMenu();
+                        setTimeout(abrirPerfil, 350);
                       } else {
                         cerrarMenu();
                         setActiveTab(tab.id);
@@ -1175,6 +1259,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'menu') {
                         cerrarFavoritos();
                         abrirMenu();
+                      } else if (tab.id === 'perfil') {
+                        cerrarFavoritos();
+                        setTimeout(abrirPerfil, 350);
                       } else {
                         cerrarFavoritos();
                         setActiveTab(tab.id);
@@ -1197,6 +1284,26 @@ function MainHomeScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Pantalla de perfil del usuario */}
+      <ProfileModal
+        visible={perfilVisible && !!usuario}
+        usuario={usuario}
+        perfil={perfilUsuario}
+        onCerrar={cerrarPerfil}
+        onNavegar={navegarDesdePerfil}
+        onActualizado={setPerfilUsuario}
+        onCerrarSesion={alCerrarSesion}
+      />
+
+      {/* Pantallas de Inicio de sesión / Registro */}
+      <AuthModal
+        mode={authMode}
+        onCambiarModo={setAuthMode}
+        onCerrar={cerrarAuth}
+        onNavegar={navegarDesdeAuth}
+        onAutenticado={alAutenticar}
+      />
     </View>
   );
 }
