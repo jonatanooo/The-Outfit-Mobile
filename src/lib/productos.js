@@ -4,20 +4,54 @@ import { collection, getDocs } from 'firebase/firestore';
 export const ID_CATEGORIA_MUJER = 56;
 export const ID_CATEGORIA_HOMBRE = 57;
 
+// Precio vigente de una variante (misma regla que usa el catálogo): precio de oferta si aplica.
+export function calcularPrecioVariante(v) {
+  const precioActual = Number(v.Precio_Actual) || 0;
+  const precioOferta = v.Precio_Oferta != null ? Number(v.Precio_Oferta) : null;
+  const enOferta = Boolean(
+    (v.Tiene_Descuento || (precioOferta && precioOferta < precioActual)) &&
+      precioOferta != null &&
+      precioOferta < precioActual
+  );
+  const porcentaje = Number(v.Porcentaje_Descuento) ||
+    (enOferta && precioActual > 0 ? Math.round((1 - precioOferta / precioActual) * 100) : 0);
+  return {
+    precioOriginal: precioActual,
+    precio: enOferta ? precioOferta : precioActual,
+    enOferta,
+    porcentajeDescuento: enOferta ? porcentaje : 0,
+  };
+}
+
 /**
  * Obtiene los productos de nuevos ingresos directamente desde Firestore
  * con fotos completas, tallas disponibles, cálculo de descuentos y clasificación por género.
  */
 export async function obtenerNuevosIngresosPorGenero() {
   try {
-    const [catSnap, prodSnap, fotosSnap, varSnap, tallaSnap, tiposTallaSnap] = await Promise.all([
+    const [catSnap, prodSnap, fotosSnap, varSnap, tallaSnap, tiposTallaSnap, invSnap, colorSnap] = await Promise.all([
       getDocs(collection(db, 'Categorias_Producto')),
       getDocs(collection(db, 'Productos')),
       getDocs(collection(db, 'Fotos_Productos')),
       getDocs(collection(db, 'Variante_Producto')),
       getDocs(collection(db, 'Talla')),
       getDocs(collection(db, 'Tipos_Talla')),
+      getDocs(collection(db, 'Inventario')),
+      getDocs(collection(db, 'Colores')),
     ]);
+
+    // Stock por variante y nombre de color (para poder añadir una variante concreta al carrito)
+    const stockPorVariante = {};
+    invSnap.docs.forEach((d) => {
+      const inv = d.data();
+      stockPorVariante[String(inv.ID_Variante)] =
+        (stockPorVariante[String(inv.ID_Variante)] || 0) + Number(inv.Cantidad_Disponible || 0);
+    });
+    const colorMap = {};
+    colorSnap.docs.forEach((d) => {
+      const c = d.data();
+      if (c.Nombre_Color) colorMap[String(c.ID_Color ?? d.id)] = c.Nombre_Color;
+    });
 
     // 1. Mapear CategoriaPadre por ID_Categoria
     const catPadreMap = {};
@@ -63,14 +97,26 @@ export async function obtenerNuevosIngresosPorGenero() {
     // 5. Indexar Variantes: Tallas disponibles y precios por ID_Producto
     const tallasPorProducto = {};
     const preciosPorProducto = {};
+    const variantesPorProducto = {};
     varSnap.docs.forEach((doc) => {
       const v = doc.data();
       const pid = String(v.ID_Producto);
 
-      // Tallas
+      // Tallas (las variantes sin talla registrada se muestran como "Única")
       if (!tallasPorProducto[pid]) tallasPorProducto[pid] = new Set();
-      const nombreTalla = tallaMap[v.ID_Talla];
-      if (nombreTalla) tallasPorProducto[pid].add(nombreTalla);
+      const nombreTalla = tallaMap[v.ID_Talla] || 'Única';
+      tallasPorProducto[pid].add(nombreTalla);
+
+      // Variantes comprables (talla/color/precio/stock)
+      const idVariante = v.ID_Variante ?? doc.id;
+      if (!variantesPorProducto[pid]) variantesPorProducto[pid] = [];
+      variantesPorProducto[pid].push({
+        id: idVariante,
+        talla: nombreTalla,
+        color: v.ID_Color != null ? colorMap[String(v.ID_Color)] || '' : '',
+        stock: stockPorVariante[String(idVariante)] ?? 0,
+        ...calcularPrecioVariante(v),
+      });
 
       // Precios y ofertas
       const precioActual = Number(v.Precio_Actual);
@@ -141,6 +187,7 @@ export async function obtenerNuevosIngresosPorGenero() {
         imagen: imagenPrincipal,
         fotos: fotosUrls.length > 0 ? fotosUrls : (imagenPrincipal ? [imagenPrincipal] : []),
         tallas: tallas,
+        variantes: variantesPorProducto[pid] || [],
         idGenero: idPadre,
         referencia: p.Referencia || String(pid).padStart(9, '7'),
       };

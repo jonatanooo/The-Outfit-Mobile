@@ -10,11 +10,18 @@ export const TABS = [
   { id: 'perfil', label: 'PERFIL', icon: require('../../assets/ICONOS/Person.png') },
 ];
 
-export default function CustomBottomTabBar({ activeTab = 'home', onTabPress }) {
+// enFlujo: la barra ocupa su lugar en el layout en vez de flotar sobre el contenido.
+export default function CustomBottomTabBar({ activeTab = 'home', onTabPress, enFlujo = false }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <View
+      style={[
+        styles.container,
+        enFlujo && styles.containerEnFlujo,
+        { paddingBottom: Math.max(insets.bottom, 12) },
+      ]}
+    >
       <View style={styles.tabsRow}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -67,6 +74,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
+  },
+  containerEnFlujo: {
+    position: 'relative',
   },
   tabsRow: {
     flexDirection: 'row',

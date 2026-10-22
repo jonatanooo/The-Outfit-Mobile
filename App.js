@@ -27,6 +27,9 @@ import { auth } from './src/lib/firebaseClient';
 import { buscarPerfil, cerrarSesion } from './src/lib/authService';
 import AuthModal from './src/components/AuthScreens';
 import ProfileModal from './src/components/ProfileScreen';
+import CarritoModal from './src/components/CarritoScreen';
+import CheckoutModal from './src/components/CheckoutScreen';
+import { CarritoProvider, elegirVariante, useCarrito } from './src/lib/CarritoContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -74,6 +77,12 @@ function MainHomeScreen() {
   const [authMode, setAuthMode] = useState(null);
   const [perfilVisible, setPerfilVisible] = useState(false);
 
+  // Carrito y proceso de compra
+  const carrito = useCarrito();
+  const [carritoVisible, setCarritoVisible] = useState(false);
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
+  const checkoutPendiente = useRef(false); // true si hay que abrir el checkout al terminar de iniciar sesión
+
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => {
       setUsuario(u);
@@ -116,7 +125,13 @@ function MainHomeScreen() {
 
   const cerrarAuth = () => {
     setAuthMode(null);
-    setActiveTab('home');
+    if (checkoutPendiente.current) {
+      // Canceló el inicio de sesión que venía del carrito: vuelve a la cesta
+      checkoutPendiente.current = false;
+      setTimeout(abrirCarrito, 350);
+    } else {
+      setActiveTab('home');
+    }
   };
 
   // Navegación desde la barra inferior de la pantalla de acceso
@@ -129,10 +144,117 @@ function MainHomeScreen() {
   const alAutenticar = (resultado, opciones = {}) => {
     if (resultado?.perfil) setPerfilUsuario(resultado.perfil);
     setAuthMode(null);
-    setActiveTab('home');
+    if (checkoutPendiente.current) {
+      checkoutPendiente.current = false;
+      setTimeout(() => setCheckoutVisible(true), 350);
+    } else {
+      setActiveTab('home');
+    }
     if (opciones.registro) {
       Alert.alert('¡Cuenta creada!', 'Tu cuenta se creó con éxito. Bienvenido a The Outfit.');
     }
+  };
+
+  // ---------- Carrito y compra ----------
+  const abrirCarrito = () => {
+    setActiveTab('cesta');
+    setCarritoVisible(true);
+  };
+
+  const cerrarCarrito = () => {
+    setCarritoVisible(false);
+    setActiveTab('home');
+  };
+
+  // Las pantallas se abren de una en una: se espera a que termine de cerrarse la anterior
+  const navegarDesdeCarrito = (tabId) => {
+    if (tabId === 'cesta') return;
+    setCarritoVisible(false);
+    setTimeout(() => handleTabPress(tabId), 350);
+  };
+
+  // Pasar a pagar exige sesión: si no la hay, se pide y luego se continúa con la compra
+  const iniciarCompra = () => {
+    setCarritoVisible(false);
+    if (!usuario) {
+      checkoutPendiente.current = true;
+      setTimeout(() => setAuthMode('login'), 350);
+      return;
+    }
+    setTimeout(() => setCheckoutVisible(true), 350);
+  };
+
+  const volverAlCarrito = () => {
+    setCheckoutVisible(false);
+    setTimeout(() => setCarritoVisible(true), 350);
+  };
+
+  const navegarDesdeCheckout = (tabId) => {
+    if (tabId === 'cesta') return;
+    setCheckoutVisible(false);
+    setTimeout(() => handleTabPress(tabId), 350);
+  };
+
+  const terminarCompra = () => {
+    setCheckoutVisible(false);
+    setTimeout(irAInicio, 350);
+  };
+
+  const buscarProducto = (id) =>
+    [...productosMujer, ...productosHombre].find((p) => String(p.id) === String(id));
+
+  // Corazón de la cesta: usa el producto completo del catálogo cuando está disponible
+  const toggleFavoritoDeCarrito = (item) => {
+    toggleFavorito(
+      buscarProducto(item.idProducto) || {
+        id: item.idProducto,
+        nombre: item.nombre,
+        imagen: item.imagen,
+        fotos: item.imagen ? [item.imagen] : [],
+        tallas: [item.talla],
+        variantes: [],
+        precio: item.precio,
+        precioOriginal: item.precioOriginal,
+        enOferta: item.enOferta,
+        porcentajeDescuento: item.porcentajeDescuento,
+        idGenero: item.idGenero,
+      }
+    );
+  };
+
+  const abrirProductoDesdeCarrito = (id) => {
+    const producto = buscarProducto(id);
+    if (!producto) return;
+    setCarritoVisible(false);
+    setActiveTab('home');
+    setTimeout(() => abrirDetalleProducto(producto), 350);
+  };
+
+  const agregarAlCarrito = (producto, talla) => {
+    const resultado = carrito.agregar(producto, elegirVariante(producto, talla));
+    if (!resultado.ok) {
+      Alert.alert('No se pudo añadir', resultado.mensaje);
+      return;
+    }
+    Alert.alert('Añadido a la cesta', `${producto.nombre} (${talla})`, [
+      { text: 'Seguir comprando', style: 'cancel' },
+      {
+        text: 'Ver cesta',
+        onPress: () => {
+          if (pdpVisible) cerrarDetalleProducto();
+          if (favoritosVisible) cerrarFavoritos();
+          setTimeout(abrirCarrito, 350);
+        },
+      },
+    ]);
+  };
+
+  // Desde favoritos: si hay una sola talla se añade directo; si no, se abre la ficha para elegirla
+  const agregarRapido = (producto) => {
+    const tallas = [...new Set((producto.variantes || []).map((v) => v.talla))];
+    if (tallas.length === 1) agregarAlCarrito(producto, tallas[0]);
+    else if (tallas.length === 0) Alert.alert('No disponible', 'Esta prenda no está disponible por ahora.');
+    else abrirDetalleProducto(producto);
   };
 
   // Verifica si un producto específico se encuentra en favoritos
@@ -235,6 +357,10 @@ function MainHomeScreen() {
       if (menuVisible) cerrarMenu();
       if (favoritosVisible) cerrarFavoritos();
       abrirPerfil();
+    } else if (tabId === 'cesta') {
+      if (menuVisible) cerrarMenu();
+      if (favoritosVisible) cerrarFavoritos();
+      abrirCarrito();
     } else {
       if (menuVisible) cerrarMenu();
       if (favoritosVisible) cerrarFavoritos();
@@ -716,11 +842,7 @@ function MainHomeScreen() {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   style={styles.pdpAddToCartButton}
-                  onPress={() => {
-                    alert(
-                      `¡${productoSeleccionado.nombre} (${tallaSeleccionada || 'Talla única'}) añadido a la cesta!`
-                    );
-                  }}
+                  onPress={() => agregarAlCarrito(productoSeleccionado, tallaSeleccionada)}
                 >
                   <Text style={styles.pdpAddToCartText}>AÑADIR A LA CESTA</Text>
                 </TouchableOpacity>
@@ -872,6 +994,9 @@ function MainHomeScreen() {
                         } else if (tab.id === 'perfil') {
                           cerrarDetalleProducto();
                           setTimeout(abrirPerfil, 350);
+                        } else if (tab.id === 'cesta') {
+                          cerrarDetalleProducto();
+                          setTimeout(abrirCarrito, 350);
                         } else {
                           setActiveTab(tab.id);
                         }
@@ -1034,6 +1159,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'perfil') {
                         cerrarMenu();
                         setTimeout(abrirPerfil, 350);
+                      } else if (tab.id === 'cesta') {
+                        cerrarMenu();
+                        setTimeout(abrirCarrito, 350);
                       } else {
                         cerrarMenu();
                         setActiveTab(tab.id);
@@ -1208,7 +1336,7 @@ function MainHomeScreen() {
                       activeOpacity={0.7}
                       onPress={(e) => {
                         e?.stopPropagation?.();
-                        alert(`¡${item.nombre} añadido a la cesta!`);
+                        agregarRapido(item);
                       }}
                       style={styles.favCartButton}
                     >
@@ -1262,6 +1390,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'perfil') {
                         cerrarFavoritos();
                         setTimeout(abrirPerfil, 350);
+                      } else if (tab.id === 'cesta') {
+                        cerrarFavoritos();
+                        setTimeout(abrirCarrito, 350);
                       } else {
                         cerrarFavoritos();
                         setActiveTab(tab.id);
@@ -1284,6 +1415,31 @@ function MainHomeScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Cesta y proceso de compra */}
+      <CarritoModal
+        visible={carritoVisible}
+        items={carrito.items}
+        subtotal={carrito.subtotal}
+        onCerrar={cerrarCarrito}
+        onNavegar={navegarDesdeCarrito}
+        onCambiarCantidad={carrito.cambiarCantidad}
+        esFavorito={esFavorito}
+        onToggleFavorito={toggleFavoritoDeCarrito}
+        onAbrirProducto={abrirProductoDesdeCarrito}
+        onContinuar={iniciarCompra}
+      />
+      <CheckoutModal
+        visible={checkoutVisible}
+        usuario={usuario}
+        perfil={perfilUsuario}
+        items={carrito.items}
+        subtotal={carrito.subtotal}
+        onVolverCarrito={volverAlCarrito}
+        onNavegar={navegarDesdeCheckout}
+        onCompraCompletada={carrito.vaciar}
+        onFinalizar={terminarCompra}
+      />
 
       {/* Pantalla de perfil del usuario */}
       <ProfileModal
@@ -1330,7 +1486,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <MainHomeScreen />
+      <CarritoProvider>
+        <MainHomeScreen />
+      </CarritoProvider>
     </SafeAreaProvider>
   );
 }
