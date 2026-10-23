@@ -1,3 +1,4 @@
+ 
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -15,10 +16,28 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
-import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
 import * as SplashScreen from 'expo-splash-screen';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import HistorialScreen from './src/app/historial';
+import PerfilScreen from './src/app/perfil';
 
 // Conexión directa a Firebase Firestore
 import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
@@ -75,7 +94,7 @@ function MainHomeScreen() {
   const [usuario, setUsuario] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState(null);
   const [authMode, setAuthMode] = useState(null);
-  const [perfilVisible, setPerfilVisible] = useState(false);
+  const [miperfilVisible, setmiPerfilVisible] = useState(false);
 
   // Carrito y proceso de compra
   const carrito = useCarrito();
@@ -315,6 +334,10 @@ function MainHomeScreen() {
 
   // Estados para la Vista de Menú
   const [menuVisible, setMenuVisible] = useState(false);
+    // nuevo, Estados para abrir pantallas perfil,historial
+  const [perfilVisible, setPerfilVisible] = useState(false);
+  const [historialVisible, setHistorialVisible] = useState(false);
+
   const [generoMenuTab, setGeneroMenuTab] = useState('mujer'); // 'mujer' | 'hombre'
 
   // Función para abrir la vista del Menú
@@ -348,6 +371,8 @@ function MainHomeScreen() {
   // Manejo de pulsación en pestañas de la barra inferior
   const handleTabPress = (tabId) => {
     setActiveTab(tabId);
+       setPerfilVisible(false); 
+    setHistorialVisible(false);
     if (tabId === 'home') {
       irAInicio();
     } else if (tabId === 'menu') {
@@ -363,7 +388,7 @@ function MainHomeScreen() {
       abrirCarrito();
     } else {
       if (menuVisible) cerrarMenu();
-      if (favoritosVisible) cerrarFavoritos();
+      if (favoritosVisible) cerrarFavoritos()
     }
   };
 
@@ -1045,8 +1070,12 @@ function MainHomeScreen() {
               activeOpacity={0.7}
               onPress={() => {
                 cerrarMenu();
+ 
                 // Espera a que cierre el modal del menú antes de abrir el de acceso
                 setTimeout(abrirPerfil, 350);
+
+               setPerfilVisible(true);
+ 
               }}
               style={styles.menuShortcutItem}
             >
@@ -1079,7 +1108,7 @@ function MainHomeScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                alert('Historial de compras');
+                setHistorialVisible(true);
               }}
               style={styles.menuShortcutItem}
             >
@@ -1408,6 +1437,78 @@ function MainHomeScreen() {
                     <Text style={[styles.tabLabel, { opacity: currentOpacity }]}>
                       {tab.label}
                     </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </SafeAreaView>
+          </Modal>
+            {/* PANTALLA DE PERFIL  */}
+      <Modal
+        visible={perfilVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => { setPerfilVisible(false); setActiveTab('home'); }}
+      >
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+          <View style={{ flex: 1  }}>
+            <PerfilScreen/>
+          </View>
+          
+          {/* Barra de navegación  */}
+          <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={styles.tabButtonsContainer}>
+              {NAV_TABS.map((tab) => {
+                const isSelected = activeTab === tab.id;
+                const currentOpacity = isSelected ? 0.90 : 0.56;
+                return (
+                  <TouchableOpacity key={tab.id} activeOpacity={0.7} 
+                    onPress={() => { 
+                      if (tab.id === 'home') { setPerfilVisible(false); irAInicio(); } 
+                      else if (tab.id === 'menu') { setPerfilVisible(false); abrirMenu(); } 
+                      else { setPerfilVisible(false); setActiveTab(tab.id); }
+                    }} 
+                    style={styles.tabButton}>
+                    <Image source={tab.icon} style={[styles.tabIcon, { opacity: currentOpacity }]} resizeMode="contain" />
+                    <Text style={[styles.tabLabel, { opacity: currentOpacity }]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* PANTALLA DE HISTORIAL */}
+      <Modal
+        visible={historialVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => { setHistorialVisible(false); setActiveTab('home'); }}
+      >
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+          <View style={{ flex: 1 }}>
+            <HistorialScreen />
+          </View>
+          
+          <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={styles.tabButtonsContainer}>
+              {NAV_TABS.map((tab) => {
+                const isSelected = activeTab === tab.id;
+                const currentOpacity = isSelected ? 0.90 : 0.56;
+                return (
+                  <TouchableOpacity key={tab.id} activeOpacity={0.7} 
+                    onPress={() => { 
+                      if (tab.id === 'home') { setHistorialVisible(false); irAInicio(); } 
+                      else if (tab.id === 'menu') { setHistorialVisible(false); abrirMenu(); } 
+                      else { setHistorialVisible(false); setActiveTab(tab.id); }
+                    }} 
+                    style={styles.tabButton}>
+                    <Image source={tab.icon} style={[styles.tabIcon, { opacity: currentOpacity }]} resizeMode="contain" />
+                    <Text style={[styles.tabLabel, { opacity: currentOpacity }]}>{tab.label}</Text>
                   </TouchableOpacity>
                 );
               })}
