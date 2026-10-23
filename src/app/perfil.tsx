@@ -21,7 +21,7 @@ export default function PerfilScreen({ onAbrirHistorial }: any) {
             dui: perfilData?.dui || 'No registrado',
             foto: user.photoURL || 'https://via.placeholder.com/100',
           });
-          setErrorDb(''); // Quitamos el error rojo
+          setErrorDb(''); 
         } catch (error) {
           console.error("Error al obtener perfil:", error);
           setErrorDb('Error al cargar perfil');
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 15, color: '#666' },
   valor: { fontSize: 15, fontWeight: '500', color: '#000' },
   
-  // Botones más pegaditos para que entren en pantalla
+  // Botones  en pantalla
   boton: { marginHorizontal: 20, marginTop: 10, padding: 12, borderWidth: 1, borderColor: '#000', borderRadius: 8, alignItems: 'center' },
   botonCerrar: { backgroundColor: '#000', marginBottom: 20 },
   botonTexto: { fontSize: 15, fontWeight: '600', color: '#000' },

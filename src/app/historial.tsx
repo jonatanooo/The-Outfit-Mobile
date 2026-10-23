@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase'; // Tu archivo de conexión
-import { auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { auth, db } from '../firebase'; // archivo de conexión
 
 export default function HistorialScreen() {
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any>(null);
@@ -29,23 +28,63 @@ export default function HistorialScreen() {
           const qPedidos = query(collection(db, 'Pedido'), where('ID_User', '==', idUser));
           const pedidosSnap = await getDocs(qPedidos);
           
-          const listaPedidos = pedidosSnap.docs.map(doc => {
+          const listaPedidos = await Promise.all(pedidosSnap.docs.map(async (doc) => {
             const data = doc.data();
+            let urlImagen = 'https://via.placeholder.com/100';
+            let nombreProducto = 'Pedido #' + data.ID_Pedido;
+
+            try {
+              // 3. Buscar el detalle para obtener la variante
+              const qDetalle = query(collection(db, 'Pedido_Detalle'), where('ID_Pedido', '==', data.ID_Pedido));
+              const detalleSnap = await getDocs(qDetalle);
+              
+              if (!detalleSnap.empty) {
+                const idVariante = detalleSnap.docs[0].data().ID_Variante;
+
+                // 4. Buscar la variante para obtener el producto
+                const qVariante = query(collection(db, 'Variante_Producto'), where('ID_Variante', '==', idVariante));
+                const varianteSnap = await getDocs(qVariante);
+
+                if (!varianteSnap.empty) {
+                  const idProducto = varianteSnap.docs[0].data().ID_Producto;
+
+                  // 5. Buscar el producto y sus fotos reales
+                  const qProducto = query(collection(db, 'Productos'), where('ID_Producto', '==', idProducto));
+                  const productoSnap = await getDocs(qProducto);
+
+                  if (!productoSnap.empty) {
+                    nombreProducto = productoSnap.docs[0].data().Nombre_Producto || nombreProducto;
+                  }
+
+                  const qFotos = query(collection(db, 'Fotos_Productos'), where('ID_Producto', '==', Number(idProducto)));
+                  const fotosSnap = await getDocs(qFotos);
+                  
+                  if (!fotosSnap.empty) {
+                    const fotosArray = fotosSnap.docs.map(d => d.data()).sort((a, b) => (a.Orden || 0) - (b.Orden || 0));
+                    if (fotosArray[0] && fotosArray[0].URL_Foto) {
+                      urlImagen = fotosArray[0].URL_Foto;
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.log("Error buscando foto:", err);
+            }
+
             return {
               id: data.ID_Pedido,
               fecha: new Date(data.Fecha_Pedido).toLocaleDateString('es-SV'),
               total: data.Total,
-              // Mapeamos el ID del estado (1=Entregado, 4=Pendiente, etc. Como no tenemos los nombres exactos, ponemos colores por defecto)
               estado: data.ID_EstadoPedidoo === 1 ? 'ENTREGADO' : (data.ID_EstadoPedidoo === 4 ? 'PENDIENTE' : 'EN CAMINO'),
               colorEstado: data.ID_EstadoPedidoo === 1 ? '#2e7d32' : (data.ID_EstadoPedidoo === 4 ? '#F9A825' : '#1976D2'),
-              nombre: 'Pedido #' + data.ID_Pedido, // Podríamos buscar los detalles, pero por ahora mostramos el ID
+              nombre: nombreProducto, 
               precio: data.Total,
               cantidad: 1,
               talla: 'Ver detalle',
-              imagen: 'https://via.placeholder.com/100',
+              imagen: urlImagen,
               metodoPago: 'Tarjeta/Simulado',
             };
-          });
+          }));
 
           setPedidos(listaPedidos);
         }
