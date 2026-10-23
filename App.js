@@ -20,26 +20,8 @@ import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import HistorialScreen from './src/app/historial';
 import PerfilScreen from './src/app/perfil';
-
-// Conexión directa a Firebase Firestore
 import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
@@ -49,7 +31,6 @@ import ProfileModal from './src/components/ProfileScreen';
 import CarritoModal from './src/components/CarritoScreen';
 import CheckoutModal from './src/components/CheckoutScreen';
 import { CarritoProvider, elegirVariante, useCarrito } from './src/lib/CarritoContext';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Diapositivas para el Carrusel Principal (Hero Banner)

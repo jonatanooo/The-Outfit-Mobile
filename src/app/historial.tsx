@@ -1,52 +1,65 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase'; // Tu archivo de conexión
+import { auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function HistorialScreen() {
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any>(null);
+  const [pedidos, setPedidos] = useState<any[]>([]);
+  const [cargando, setCargando] = useState(true);
 
-  const pedidosPrueba = [
-    {
-      id: 'PED-001',
-      fecha: '05/08/2026',
-      total: 35.99,
-      estado: 'ENTREGADO',
-      colorEstado: '#2e7d32', // Verde
-      nombre: 'VESTIDO MINI TIRANTES PRINT',
-      precio: 35.99,
-      cantidad: 1,
-      talla: 'S MARRÓN',
-      imagen: 'https://via.placeholder.com/100',
-      metodoPago: 'VISA TERMINADA EN 1234',
-    },
-    {
-      id: 'PED-002',
-      fecha: '05/08/2026',
-      total: 49.99,
-      estado: 'EN CAMINO',
-      colorEstado: '#1976D2', // Azul
-      nombre: 'CAZADORA EFECTO PIEL',
-      precio: 49.99,
-      cantidad: 1,
-      talla: 'L NEGRA',
-      imagen: 'https://via.placeholder.com/100',
-      metodoPago: 'PAYPAL',
-    },
-    {
-      id: 'PED-003',
-      fecha: '05/08/2026',
-      total: 35.99,
-      estado: 'PENDIENTE',
-      colorEstado: '#F9A825', // Amarillo
-      nombre: 'VESTIDO MINI CORSÉ RÚSTICO',
-      precio: 35.99,
-      cantidad: 1,
-      talla: 'M BLANCO',
-      imagen: 'https://via.placeholder.com/100',
-      metodoPago: 'TARJETA DE REGALO',
-    }
-  ];
+  useEffect(() => {
+    const cancelar = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCargando(false);
+        return;
+      }
 
-  // --- VISTA DE DETALLE (La que pediste con el QR) ---
+      try {
+        // 1. Obtener el ID_User del usuario logueado (buscando en la colección User)
+        const qUser = query(collection(db, 'User'), where('auth_id', '==', user.uid));
+        const userSnap = await getDocs(qUser);
+        
+        if (!userSnap.empty) {
+          const idUser = userSnap.docs[0].data().ID_User;
+
+          // 2. Buscar los pedidos de ese usuario
+          const qPedidos = query(collection(db, 'Pedido'), where('ID_User', '==', idUser));
+          const pedidosSnap = await getDocs(qPedidos);
+          
+          const listaPedidos = pedidosSnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: data.ID_Pedido,
+              fecha: new Date(data.Fecha_Pedido).toLocaleDateString('es-SV'),
+              total: data.Total,
+              // Mapeamos el ID del estado (1=Entregado, 4=Pendiente, etc. Como no tenemos los nombres exactos, ponemos colores por defecto)
+              estado: data.ID_EstadoPedidoo === 1 ? 'ENTREGADO' : (data.ID_EstadoPedidoo === 4 ? 'PENDIENTE' : 'EN CAMINO'),
+              colorEstado: data.ID_EstadoPedidoo === 1 ? '#2e7d32' : (data.ID_EstadoPedidoo === 4 ? '#F9A825' : '#1976D2'),
+              nombre: 'Pedido #' + data.ID_Pedido, // Podríamos buscar los detalles, pero por ahora mostramos el ID
+              precio: data.Total,
+              cantidad: 1,
+              talla: 'Ver detalle',
+              imagen: 'https://via.placeholder.com/100',
+              metodoPago: 'Tarjeta/Simulado',
+            };
+          });
+
+          setPedidos(listaPedidos);
+        }
+      } catch (error) {
+        console.error("Error cargando pedidos:", error);
+      } finally {
+        setCargando(false);
+      }
+    });
+
+    return () => cancelar();
+  }, []);
+
+  // --- VISTA DE DETALLE ---
   if (pedidoSeleccionado) {
     return (
       <View style={styles.container}>
@@ -62,32 +75,25 @@ export default function HistorialScreen() {
               </View>
             </View>
             
-            <Text style={styles.detallePrecio}>${pedidoSeleccionado.precio.toFixed(2)} x {pedidoSeleccionado.cantidad}</Text>
-            <Text style={styles.detalleTalla}>TALLA {pedidoSeleccionado.talla}</Text>
-
-            <Image source={{ uri: pedidoSeleccionado.imagen }} style={styles.detalleImagen} />
+            <Text style={styles.detallePrecio}>${pedidoSeleccionado.total.toFixed(2)}</Text>
 
             <View style={styles.lineaDivisoria} />
             <View style={styles.filaTotal}><Text style={styles.textoTotal}>SUBTOTAL</Text><Text style={styles.textoTotal}>${pedidoSeleccionado.total.toFixed(2)}</Text></View>
-            <View style={styles.filaTotal}><Text style={styles.textoTotal}>GASTOS DE ENVÍO</Text><Text style={styles.textoTotal}>GRATIS</Text></View>
             <View style={styles.lineaDivisoria} />
             <View style={styles.filaTotal}><Text style={[styles.textoTotal, { fontWeight: 'bold', fontSize: 16 }]}>TOTAL</Text><Text style={[styles.textoTotal, { fontWeight: 'bold', fontSize: 16 }]}>${pedidoSeleccionado.total.toFixed(2)}</Text></View>
             <View style={styles.lineaDivisoria} />
 
-            <View style={styles.filaInfo}><Text style={styles.labelInfo}>ID TRANSACCIÓN</Text><Text style={styles.valorInfo}>#{pedidoSeleccionado.id}43546456757</Text></View>
-            <View style={styles.filaInfo}><Text style={styles.labelInfo}>FECHA Y HORA</Text><Text style={styles.valorInfo}>{pedidoSeleccionado.fecha} 01:29 AM</Text></View>
-            <View style={styles.filaInfo}><Text style={styles.labelInfo}>LUGAR DE ENVÍO</Text><Text style={styles.valorInfo}>SUCURSAL THE OUTFIT</Text></View>
-            <View style={styles.filaInfo}><Text style={styles.labelInfo}>MÉTODO DE PAGO</Text><Text style={styles.valorInfo}>{pedidoSeleccionado.metodoPago}</Text></View>
+            <View style={styles.filaInfo}><Text style={styles.labelInfo}>ID TRANSACCIÓN</Text><Text style={styles.valorInfo}>#{pedidoSeleccionado.id}</Text></View>
+            <View style={styles.filaInfo}><Text style={styles.labelInfo}>FECHA</Text><Text style={styles.valorInfo}>{pedidoSeleccionado.fecha}</Text></View>
 
             <View style={styles.qrContainer}>
               <Image 
-                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${pedidoSeleccionado.id}` }} 
+                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PEDIDO-${pedidoSeleccionado.id}` }} 
                 style={{ width: 100, height: 100 }} 
               />
             </View>
           </View>
           
-          {/* Botón para volver a la lista */}
           <TouchableOpacity style={{ marginTop: 20, marginBottom: 40, alignItems: 'center' }} onPress={() => setPedidoSeleccionado(null)}>
             <Text style={{ fontSize: 16, fontWeight: 'bold', textDecorationLine: 'underline' }}>Volver a mis pedidos</Text>
           </TouchableOpacity>
@@ -103,27 +109,33 @@ export default function HistorialScreen() {
         <Text style={styles.titulo}>HISTORIAL DE COMPRAS</Text>
       </View>
 
-      <ScrollView style={styles.listaContainer}>
-        {pedidosPrueba.map((pedido) => (
-          <TouchableOpacity 
-            key={pedido.id} 
-            style={styles.tarjetaPedido}
-            onPress={() => setPedidoSeleccionado(pedido)}
-          >
-            <Image source={{ uri: pedido.imagen }} style={styles.imagenProducto} />
+      {cargando ? (
+        <ActivityIndicator size="large" color="#000" style={{ marginTop: 50 }} />
+      ) : pedidos.length === 0 ? (
+        <Text style={{ textAlign: 'center', marginTop: 50, color: '#666' }}>No tienes compras aún.</Text>
+      ) : (
+        <ScrollView style={styles.listaContainer}>
+          {pedidos.map((pedido) => (
+            <TouchableOpacity 
+              key={pedido.id} 
+              style={styles.tarjetaPedido}
+              onPress={() => setPedidoSeleccionado(pedido)}
+            >
+              <Image source={{ uri: pedido.imagen }} style={styles.imagenProducto} />
 
-            <View style={styles.detallesContainer}>
-              <Text style={styles.nombreProducto}>{pedido.nombre}</Text>
-              <Text style={styles.precio}>${pedido.precio.toFixed(2)} x {pedido.cantidad}</Text>
-              <Text style={styles.talla}>TALLA {pedido.talla}</Text>
-            </View>
+              <View style={styles.detallesContainer}>
+                <Text style={styles.nombreProducto}>{pedido.nombre}</Text>
+                <Text style={styles.precio}>${pedido.precio.toFixed(2)}</Text>
+                <Text style={styles.talla}>Ver detalles de envío</Text>
+              </View>
 
-            <View style={[styles.estadoBadge, { backgroundColor: pedido.colorEstado }]}>
-              <Text style={styles.estadoTexto}>{pedido.estado}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <View style={[styles.estadoBadge, { backgroundColor: pedido.colorEstado }]}>
+                <Text style={styles.estadoTexto}>{pedido.estado}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -145,8 +157,6 @@ const styles = StyleSheet.create({
   detalleCard: { backgroundColor: '#fff' },
   detalleNombre: { fontSize: 14, fontWeight: 'bold', color: '#000', flex: 1, marginRight: 10 },
   detallePrecio: { fontSize: 16, marginTop: 10 },
-  detalleTalla: { fontSize: 14, color: '#666', marginBottom: 15 },
-  detalleImagen: { width: '60%', height: 200, alignSelf: 'center', resizeMode: 'contain', marginBottom: 20, backgroundColor: '#f9f9f9', borderRadius: 8 },
   lineaDivisoria: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 15 },
   filaTotal: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   textoTotal: { fontSize: 14, color: '#000' },

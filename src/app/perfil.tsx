@@ -1,49 +1,41 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { db } from '../../src/firebase';
-
+import { auth } from '../firebase';
+import { buscarPerfil } from '../lib/authService';
 export default function PerfilScreen({ onAbrirHistorial }: any) {
   const [usuario, setUsuario] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [errorDb, setErrorDb] = useState('');
 
-  useEffect(() => {
-    async function probarConexion() {
-      try {
-        const docRef = doc(db, 'usuarios', 'prueba');
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          setUsuario(docSnap.data());
-        } else {
+    useEffect(() => {
+    const cancelar = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Buscamos los datos reales en Firestore
+          const perfilData:any = await buscarPerfil(user);
           setUsuario({
-            nombre: 'Conexión Exitosa (Falta Auth)',
-            correo: 'hectorjavier1925@gmail.com',
-            telefono: '+503 7521-9344',
-            dui: '12345678-9',
-            foto: 'https://via.placeholder.com/100',
+            nombre: perfilData?.nombre || user.displayName || 'Usuario',
+            correo: user.email,
+            telefono: perfilData?.telefono || 'No registrado',
+            dui: perfilData?.dui || 'No registrado',
+            foto: user.photoURL || 'https://via.placeholder.com/100',
           });
+          setErrorDb(''); // Quitamos el error rojo
+        } catch (error) {
+          console.error("Error al obtener perfil:", error);
+          setErrorDb('Error al cargar perfil');
         }
-      } catch (error) {
-        console.error("Error conectando a Firebase:", error);
-        setUsuario({
-            nombre: 'Conexión Exitosa (Falta Auth)',
-            correo: 'hectorjavier1925@gmail.com',
-            telefono: '+503 7521-9344',
-            dui: '12345678-9',
-            foto: 'https://via.placeholder.com/100',
-          });
-        
-        setErrorDb('Error al conectar con la base de datos.');
-      } finally {
-        setCargando(false);
+      } else {
+        setUsuario(null);
+        setErrorDb('Inicia sesión para ver tu perfil');
       }
-    }
+      setCargando(false);
+    });
 
-    probarConexion();
+    return () => cancelar();
   }, []);
-
+  
   if (cargando) {
     return (
       <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
