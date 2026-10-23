@@ -45,3 +45,7 @@ example
 # firebase secrets
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
+
+# Firebase / Google Sign-In (config local)
+google-services.json
+.env

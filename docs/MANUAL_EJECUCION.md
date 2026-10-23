@@ -1,118 +1,101 @@
-# Manual de ejecución para contribuyentes
+# Manual de ejecución
 
-Guía para levantar **The Outfit Mobile** (Expo SDK 58 / React Native) en un emulador Android o en un celular físico.
+Pasos para correr **The Outfit Mobile** en un emulador Android (Pixel 8) en Windows.
 
-## 1. Requisitos previos
+## Antes de empezar
 
-| Herramienta | Versión | Notas |
-|---|---|---|
-| Node.js | 20 LTS o superior | https://nodejs.org |
-| npm | el que trae Node | No usar yarn/pnpm/bun: el repo usa `package-lock.json` |
-| Git | cualquiera reciente | |
-| Android Studio | última | Solo si usarás emulador |
-| Expo Go | última versión | Solo si usarás celular físico |
+Instala estos programas:
 
-## 2. Clonar e instalar
+- [Node.js 20 LTS o superior](https://nodejs.org)
+- [Git](https://git-scm.com)
+- [Android Studio](https://developer.android.com/studio)
 
-```bash
+Y activa la virtualización en la BIOS y **Windows Hypervisor Platform** en Windows.
+
+## Paso 1: Clonar el repositorio
+
+Clónalo en una **carpeta con ruta corta** (por ejemplo `C:\dev`). Windows falla al compilar si la ruta es muy larga.
+
+```powershell
+mkdir C:\dev
+cd C:\dev
 git clone <url-del-repositorio>
 cd The-Outfit-Mobile
+```
+
+## Paso 2: Instalar dependencias
+
+```powershell
 npm install
 ```
 
-Para agregar una librería nueva usa siempre:
+## Paso 3: Crear el archivo `.env`
 
-```bash
-npx expo install <paquete>
+En la raíz del proyecto crea un archivo llamado `.env` con esta línea (es para el inicio de sesión con Google):
+
+```
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=317665000506-7nh1dr5smdo6lpevda7gao8ki859gopf.apps.googleusercontent.com
 ```
 
-Si algo queda desalineado con el SDK: `npx expo install --fix`.
+## Paso 4: Crear el emulador
 
-> Los avisos de "vulnerabilities" y de scripts `postinstall` (firebase, protobufjs) que muestra `npm install` son normales.
+1. Abre Android Studio y entra a **Device Manager**.
+2. Pulsa **Create Device**, elige **Pixel 8** y descarga una imagen del sistema.
+3. Pulsa ▶ y espera a que el emulador muestre la pantalla de inicio.
 
-## 3. Firebase
+## Paso 5: Configurar Android en la terminal
 
-No requiere configuración: `src/lib/firebaseClient.js` trae valores por defecto. Si quieres apuntar a otro proyecto, define las variables `NEXT_PUBLIC_FIREBASE_*` en un archivo `.env` local (no se sube al repositorio).
+Ejecuta esto en PowerShell (hay que repetirlo cada vez que abras una terminal nueva):
 
-## 4. Ejecutar
-
-### Opción A: emulador Android (Windows)
-
-1. En Android Studio abre **Device Manager** → **Create Device** (ej. *Pixel 8*) → descarga una imagen del sistema → **Finish**.
-2. Pulsa ▶ y espera a que el emulador muestre la pantalla de inicio.
-3. Define las variables del SDK en la terminal (PowerShell):
-   ```powershell
-   $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
-   $env:Path += ";$env:ANDROID_HOME\platform-tools"
-   ```
-   Para hacerlo permanente, agrega `ANDROID_HOME` y `platform-tools` a las variables de entorno de Windows.
-4. Verifica que el emulador sea visible:
-   ```powershell
-   adb devices
-   ```
-5. Arranca la app:
-   ```bash
-   npx expo start --android
-   ```
-   Expo instala Expo Go en el emulador y abre el proyecto. La primera vez tarda.
-
-Requisito: virtualización activada en la BIOS y **Hyper-V / Windows Hypervisor Platform** habilitado.
-
-### Opción B: celular físico con Expo Go
-
-1. Instala **Expo Go** (Play Store / App Store) y actualízalo a la última versión.
-2. Conecta celular y PC a la **misma red Wi-Fi**.
-3. Ejecuta:
-   ```bash
-   npx expo start
-   ```
-4. Escanea el QR (Android: desde Expo Go; iPhone: desde la cámara).
-5. Si la red no lo permite (redes institucionales): `npx expo start --tunnel`.
-
-### Opción C: navegador
-
-```bash
-npx expo start --web
+```powershell
+$env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+$env:Path += ";$env:ANDROID_HOME\platform-tools"
 ```
 
-> iOS Simulator solo está disponible en Mac con Xcode.
+Comprueba que el emulador aparece en la lista:
 
-## 5. Atajos en la terminal de Expo
-
-| Tecla | Acción |
-|---|---|
-| `a` | Abrir en Android |
-| `w` | Abrir en web |
-| `r` | Recargar la app |
-| `Ctrl + C` | Detener el servidor |
-
-Al guardar un archivo, la app se actualiza sola.
-
-## 6. Validar antes de subir cambios
-
-```bash
-npx tsc --noEmit    # tipos
-npx expo lint       # lint
+```powershell
+adb devices
 ```
 
-Ambos deben terminar sin errores.
+## Paso 6: Compilar e instalar la app
 
-## 7. Flujo de trabajo con Git
+```powershell
+npx expo run:android
+```
 
-1. Actualiza `main`: `git checkout main && git pull`.
-2. Crea tu rama: `git checkout -b feat/nombre-descriptivo`.
-3. Haz commits pequeños con mensajes claros (`feat:`, `fix:`, `docs:`).
-4. Sube la rama: `git push -u origin feat/nombre-descriptivo`.
-5. Abre un Pull Request hacia `main`. No hagas push directo a `main`.
+La primera vez tarda entre 10 y 20 minutos. Después tarda 1 o 2. Al terminar, la app se abre sola en el emulador.
 
-## 8. Problemas frecuentes
+> Se usa `run:android` y no Expo Go porque el inicio de sesión con Google necesita código nativo.
+
+## Paso 7: Abrir la app otra vez
+
+Ya no hace falta compilar. Solo inicia el servidor:
+
+```powershell
+npx expo start --dev-client
+```
+
+Con el emulador abierto, pulsa `a` en la terminal. Los cambios en el código se ven al guardar.
+
+Solo vuelve a ejecutar el paso 6 si instalas una librería nativa nueva o cambias `app.json`.
+
+## Problemas frecuentes
 
 | Problema | Solución |
 |---|---|
-| `adb` no se reconoce | Define `ANDROID_HOME` y agrega `platform-tools` al `Path` (paso 3 de la opción A) |
-| Expo Go dice "versión incompatible" | Actualiza Expo Go; el proyecto usa SDK 58 |
-| El celular no conecta al QR | Misma Wi-Fi, o usa `--tunnel` |
-| Puerto 8081 ocupado | Cierra el otro Metro o acepta usar otro puerto |
-| Error por módulo nativo no incluido en Expo Go | Usa un development build: `npx expo run:android` |
-| Dependencias raras tras cambiar de rama | Borra `node_modules` y ejecuta `npm install` |
-| Caché corrupta de Metro | `npx expo start -c` |
+| `adb` no se reconoce | Repite el paso 5 |
+| Error `ninja: mkdir ... No such file or directory` al compilar | La ruta del proyecto es muy larga. Clónalo en `C:\dev` (paso 1) |
+| La app muestra "Unable to load script" | Inicia el servidor (paso 7) y ejecuta `adb reverse tcp:8081 tcp:8081` |
+| Google dice `DEVELOPER_ERROR` | Tu SHA-1 no está registrado en Firebase. Pídelo al encargado del proyecto |
+| Puerto 8081 ocupado | Cierra la otra terminal con Metro |
+| Cosas raras tras cambiar de rama | Borra `node_modules` y ejecuta `npm install` |
+
+## Subir cambios a Git
+
+1. `git checkout main && git pull`
+2. `git checkout -b feat/nombre-descriptivo`
+3. Haz tus cambios y commitea.
+4. `git push -u origin feat/nombre-descriptivo`
+5. Abre un Pull Request hacia `main`. No hagas push directo a `main`.
