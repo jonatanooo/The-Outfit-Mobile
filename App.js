@@ -26,6 +26,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
 import { buscarPerfil, cerrarSesion } from './src/lib/authService';
 import AuthModal from './src/components/AuthScreens';
+import CatalogoCategorias from './src/components/catalogo/CatalogoCategorias';
 import ProfileModal from './src/components/ProfileScreen';
 import CarritoModal from './src/components/CarritoScreen';
 import CheckoutModal from './src/components/CheckoutScreen';
@@ -1131,8 +1132,25 @@ function MainHomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* 4. Espacio inferior completamente vacío (por ahora) */}
-          <View style={styles.menuEmptyContent} />
+         
+        {/* 4. Catálogo y filtros - Persona 2 */}
+       <View style={styles.menuEmptyContent}>
+        {cargandoProductos ? (
+       <ActivityIndicator size="large" color="#000000" />
+        ) : (
+       <CatalogoCategorias
+      productosMujer={productosMujer}
+      productosHombre={productosHombre}
+      generoSeleccionado={generoMenuTab}
+      mostrarSelectorGenero={false}
+      onSeleccionarProducto={(producto) => {
+        cerrarMenu();
+        setTimeout(() => abrirDetalleProducto(producto), 350);
+          }}
+         />
+         )}
+         </View>
+
 
           {/* 5. Barra de Navegación Inferior (con MENÚ activo al 0.90 y resto a 0.56) */}
           <View
