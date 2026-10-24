@@ -1,6 +1,6 @@
 
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 
 
@@ -32,6 +32,7 @@ export default function CatalogoCategorias({
   generoSeleccionado,
   mostrarSelectorGenero = true,
   onCategoriaAbierta,
+  iniciarEnVerTodo = false,
   esFavorito,
   onToggleFavorito,
 }) {
@@ -42,7 +43,7 @@ export default function CatalogoCategorias({
   const [filtrosActivos, setFiltrosActivos] = useState({});
   
 const [categoriaSeleccionada, setCategoriaSeleccionada] =
-  useState(null);
+  useState(iniciarEnVerTodo ? VER_TODO : null);
 
 
 const [categoriaPorProducto, setCategoriaPorProducto] =
@@ -207,8 +208,15 @@ const cambiarGenero = (genero) => {
   setFiltrosActivos({});
 };
 
+// Al cambiar de género se vuelve a la lista de categorías (no en el primer render,
+// para respetar "Ver todo" cuando el menú se abre desde el carrusel).
+const primerRender = useRef(true);
 useEffect(() => {
-     setCategoriaSeleccionada(null);
+  if (primerRender.current) {
+    primerRender.current = false;
+    return;
+  }
+  setCategoriaSeleccionada(null);
   setFiltrosActivos({});
 }, [generoActivo]);
 
