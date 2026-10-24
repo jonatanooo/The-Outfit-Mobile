@@ -14,13 +14,11 @@ Y activa la virtualización en la BIOS y **Windows Hypervisor Platform** en Wind
 
 ## Paso 1: Clonar el repositorio
 
-Clónalo en una **carpeta con ruta corta** (por ejemplo `C:\dev`). Windows falla al compilar si la ruta es muy larga.
+Clónalo en una **ruta muy corta**, sin espacios y de pocos caracteres (por ejemplo `C:\o`). Windows limita las rutas a 260 caracteres y la compilación nativa las alarga. Con `C:\dev\The-Outfit-Mobile` o con carpetas como `Desktop\...` **sigue fallando**.
 
 ```powershell
-mkdir C:\dev
-cd C:\dev
-git clone <url-del-repositorio>
-cd The-Outfit-Mobile
+git clone <url-del-repositorio> C:\o
+cd C:\o
 ```
 
 ## Paso 2: Instalar dependencias
@@ -86,7 +84,8 @@ Solo vuelve a ejecutar el paso 6 si instalas una librería nativa nueva o cambia
 | Problema | Solución |
 |---|---|
 | `adb` no se reconoce | Repite el paso 5 |
-| Error `ninja: mkdir ... No such file or directory` al compilar | La ruta del proyecto es muy larga. Clónalo en `C:\dev` (paso 1) |
+| Error `ninja: mkdir ... No such file or directory` o `Filename longer than 260 characters` al compilar | La ruta del proyecto es muy larga. Clónalo en `C:\o` (paso 1). Si ya compilaste en otra ruta, borra la carpeta `android` y vuelve a ejecutar el paso 6 |
+| Error `TurboModuleRegistry ... 'RNGoogleSignin' could not be found` | La app abierta es un build viejo. Ciérrala por completo (o `adb shell am force-stop com.theoutfit.mobile`) y ábrela de nuevo tras el paso 6 |
 | La app muestra "Unable to load script" | Inicia el servidor (paso 7) y ejecuta `adb reverse tcp:8081 tcp:8081` |
 | Google dice `DEVELOPER_ERROR` | Tu SHA-1 no está registrado en Firebase. Pídelo al encargado del proyecto |
 | Puerto 8081 ocupado | Cierra la otra terminal con Metro |
