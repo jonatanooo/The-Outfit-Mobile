@@ -33,10 +33,20 @@ export function ListaPrendas({ items }) {
             {item.imagen ? <Image source={{ uri: item.imagen }} style={ui.prendaImagen} resizeMode="cover" /> : null}
           </View>
           <View style={ui.prendaTextos}>
-            <Text style={ui.prendaNombre} numberOfLines={2}>
-              {item.nombre.toUpperCase()}
-            </Text>
+            <View style={ui.prendaNombreFila}>
+              <Text style={[ui.prendaNombre, ui.prendaNombreFlex]} numberOfLines={2}>
+                {item.nombre.toUpperCase()}
+              </Text>
+              {item.enOferta && item.porcentajeDescuento > 0 && (
+                <View style={ui.etiquetaDescuento}>
+                  <Text style={ui.etiquetaDescuentoTexto}>-{item.porcentajeDescuento}%</Text>
+                </View>
+              )}
+            </View>
             <Text style={ui.prendaPrecio}>
+              {item.enOferta && item.precioOriginal > item.precio ? (
+                <Text style={ui.precioTachado}>{formatoPrecio(item.precioOriginal)} </Text>
+              ) : null}
               {formatoPrecio(item.precio)} x {item.cantidad}
             </Text>
             <Text style={ui.prendaTalla}>
@@ -50,14 +60,22 @@ export function ListaPrendas({ items }) {
   );
 }
 
-export function Totales({ subtotal, envio, total }) {
+// subtotalOriginal y ahorro son opcionales: si hay ahorro se muestra el descuento por separado.
+export function Totales({ subtotal, subtotalOriginal, ahorro = 0, envio, total }) {
+  const hayDescuento = ahorro > 0 && subtotalOriginal > subtotal;
   return (
     <View style={ui.totales}>
       <View style={ui.totalLinea} />
       <View style={ui.totalFila}>
         <Text style={ui.totalEtiqueta}>SUBTOTAL</Text>
-        <Text style={ui.totalValor}>{formatoPrecio(subtotal)}</Text>
+        <Text style={ui.totalValor}>{formatoPrecio(hayDescuento ? subtotalOriginal : subtotal)}</Text>
       </View>
+      {hayDescuento && (
+        <View style={ui.totalFila}>
+          <Text style={ui.totalEtiqueta}>DESCUENTO</Text>
+          <Text style={[ui.totalValor, ui.valorDescuento]}>-{formatoPrecio(ahorro)}</Text>
+        </View>
+      )}
       <View style={ui.totalFila}>
         <Text style={ui.totalEtiqueta}>GASTOS DE ENVÍO</Text>
         <Text style={ui.totalValor}>{envio > 0 ? formatoPrecio(envio) : 'GRATIS'}</Text>
@@ -141,7 +159,13 @@ export const ui = StyleSheet.create({
   prendaImagen: { width: '100%', height: '100%' },
   prendaTextos: { flex: 1 },
   prendaNombre: { fontFamily: FONT, fontSize: 13, letterSpacing: 0.3, color: NEGRO },
+  prendaNombreFila: { flexDirection: 'row', alignItems: 'flex-start' },
+  prendaNombreFlex: { flex: 1 },
+  etiquetaDescuento: { backgroundColor: NEGRO, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2, marginLeft: 8 },
+  etiquetaDescuentoTexto: { fontFamily: FONT, fontSize: 10, letterSpacing: 0.5, color: '#FFFFFF' },
   prendaPrecio: { fontFamily: FONT, fontSize: 13, color: '#1A1A1A', marginTop: 3 },
+  precioTachado: { color: '#8A8A8A', textDecorationLine: 'line-through' },
+  valorDescuento: { color: VERDE },
   prendaTalla: { fontFamily: FONT, fontSize: 12, color: '#1A1A1A', marginTop: 2 },
 
   totales: { paddingHorizontal: 20, marginTop: 4 },
