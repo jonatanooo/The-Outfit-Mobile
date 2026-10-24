@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry, NativeModules, Alert } from 'react-native';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -138,13 +138,27 @@ export async function recuperarPassword(correo) {
 }
 
 // ---------- Google ----------
-// En web se usa el popup de Firebase. En Android/iOS se usa Google Sign-In nativo,
-// que requiere un development build (no funciona en Expo Go) y el Web Client ID de
-// Firebase Console > Authentication > Método de acceso > Google.
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+// En web se usa el popup de Firebase. En Android/iOS se usa Google Sign-In nativo
+// cuando se ejecuta un development build (npx expo run:android).
+// En Expo Go (sin binario nativo), se ofrece un modo demo o alerta guiada para evitar crash.
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '317665000506-7nh1dr5smdo6lpevda7gao8ki859gopf.apps.googleusercontent.com';
 let googleConfigurado = false;
 
+function tieneGoogleNativo() {
+  if (Platform.OS === 'web') return false;
+  try {
+    const turbo = TurboModuleRegistry?.get ? TurboModuleRegistry.get('RNGoogleSignin') : null;
+    const legacy = NativeModules?.RNGoogleSignin;
+    return Boolean(turbo || legacy);
+  } catch {
+    return false;
+  }
+}
+
 function cargarGoogleNativo() {
+  if (!tieneGoogleNativo()) return null;
   try {
     return require('@react-native-google-signin/google-signin');
   } catch {
@@ -152,18 +166,89 @@ function cargarGoogleNativo() {
   }
 }
 
-async function obtenerCredencialGoogle() {
+export async function iniciarSesionDemoGoogle() {
+  const correoDemo = 'usuario.google.demo@theoutfit.com';
+  const passwordDemo = 'GoogleDemo2026!';
+  let user;
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, correoDemo, passwordDemo);
+    user = cred.user;
+  } catch (error) {
+    if (
+      error.code === 'auth/user-not-found' ||
+      error.code === 'auth/invalid-credential' ||
+      error.code === 'auth/wrong-password'
+    ) {
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, correoDemo, passwordDemo);
+        user = cred.user;
+        await updateProfile(user, { displayName: 'Usuario Google (Demo)' });
+      } catch (errCrear) {
+        if (errCrear.code === 'auth/email-already-in-use') {
+          const cred = await signInWithEmailAndPassword(auth, correoDemo, passwordDemo);
+          user = cred.user;
+        } else {
+          throw errCrear;
+        }
+      }
+    } else {
+      throw error;
+    }
+  }
+
+  let perfil = await buscarPerfil(user);
+  if (!perfil) {
+    perfil = await crearPerfil(user, {
+      nombres: user.displayName || 'Usuario Google (Demo)',
+      username: 'usuario_google',
+    });
+  }
+  await rechazarSiBaneado(perfil);
+  return { user, perfil };
+}
+
+// Devuelve null si el usuario cancela el flujo o { user, perfil } al autenticarse.
+export async function continuarConGoogle() {
   if (Platform.OS === 'web') {
     const resultado = await signInWithPopup(auth, new GoogleAuthProvider());
-    return { user: resultado.user };
+    const user = resultado.user;
+    let perfil = await buscarPerfil(user);
+    if (!perfil) perfil = await crearPerfil(user, { nombres: user.displayName || '' });
+    await rechazarSiBaneado(perfil);
+    return { user, perfil };
   }
 
   const modulo = cargarGoogleNativo();
   if (!modulo || !modulo.GoogleSignin) {
-    throw new AuthError(
-      'Google Sign-In necesita un development build. No está disponible en Expo Go.'
-    );
+    // Detectado Expo Go o build sin el módulo nativo compilado
+    return new Promise((resolve) => {
+      Alert.alert(
+        'Google Sign-In en Expo Go',
+        'El inicio de sesión nativo con Google requiere compilar la app con "npx expo run:android" (Development Build), ya que Expo Go no contiene los binarios de Google Play Services.\n\n¿Deseas ingresar en Modo Demo (Google) para probar la app en Expo Go?',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+            onPress: () => resolve(null),
+          },
+          {
+            text: 'Entrar en Modo Demo',
+            onPress: async () => {
+              try {
+                const res = await iniciarSesionDemoGoogle();
+                resolve(res);
+              } catch (e) {
+                Alert.alert('Error Demo', e.message || 'No se pudo iniciar en modo demo.');
+                resolve(null);
+              }
+            },
+          },
+        ]
+      );
+    });
   }
+
   if (!GOOGLE_WEB_CLIENT_ID) {
     throw new AuthError(
       'Falta configurar EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID para iniciar sesión con Google.'
@@ -182,25 +267,17 @@ async function obtenerCredencialGoogle() {
     if (!isSuccessResponse(respuesta)) return null; // El usuario canceló.
     const idToken = respuesta.data.idToken;
     if (!idToken) throw new AuthError('Google no devolvió un token de acceso.');
-    const resultado = await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
-    return { user: resultado.user };
+    const credencial = await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+    const user = credencial.user;
+    let perfil = await buscarPerfil(user);
+    if (!perfil) perfil = await crearPerfil(user, { nombres: user.displayName || '' });
+    await rechazarSiBaneado(perfil);
+    return { user, perfil };
   } catch (e) {
     if (isErrorWithCode?.(e) && e.code === statusCodes.SIGN_IN_CANCELLED) return null;
     if (isErrorWithCode?.(e) && e.code === statusCodes.IN_PROGRESS) return null;
     throw e;
   }
-}
-
-// Devuelve null si el usuario cancela el flujo.
-export async function continuarConGoogle() {
-  const credencial = await obtenerCredencialGoogle();
-  if (!credencial) return null;
-
-  const { user } = credencial;
-  let perfil = await buscarPerfil(user);
-  if (!perfil) perfil = await crearPerfil(user, { nombres: user.displayName || '' });
-  await rechazarSiBaneado(perfil);
-  return { user, perfil };
 }
 
 // Actualiza el mismo documento del usuario (no crea otro). Solo escribe lo que cambió:
