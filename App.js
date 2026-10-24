@@ -1,3 +1,4 @@
+ 
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -15,19 +16,22 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
-import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
 import * as SplashScreen from 'expo-splash-screen';
-
-// Conexión directa a Firebase Firestore
+import HistorialScreen from './src/app/historial';
+import PerfilScreen from './src/app/perfil';
 import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
 import { buscarPerfil, cerrarSesion } from './src/lib/authService';
 import AuthModal from './src/components/AuthScreens';
+import CatalogoCategorias from './src/components/catalogo/CatalogoCategorias';
 import ProfileModal from './src/components/ProfileScreen';
-
+import CarritoModal from './src/components/CarritoScreen';
+import CheckoutModal from './src/components/CheckoutScreen';
+import { CarritoProvider, elegirVariante, useCarrito } from './src/lib/CarritoContext';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Diapositivas para el Carrusel Principal (Hero Banner)
@@ -72,7 +76,13 @@ function MainHomeScreen() {
   const [usuario, setUsuario] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState(null);
   const [authMode, setAuthMode] = useState(null);
-  const [perfilVisible, setPerfilVisible] = useState(false);
+  const [miperfilVisible, setmiPerfilVisible] = useState(false);
+
+  // Carrito y proceso de compra
+  const carrito = useCarrito();
+  const [carritoVisible, setCarritoVisible] = useState(false);
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
+  const checkoutPendiente = useRef(false); // true si hay que abrir el checkout al terminar de iniciar sesión
 
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => {
@@ -116,7 +126,13 @@ function MainHomeScreen() {
 
   const cerrarAuth = () => {
     setAuthMode(null);
-    setActiveTab('home');
+    if (checkoutPendiente.current) {
+      // Canceló el inicio de sesión que venía del carrito: vuelve a la cesta
+      checkoutPendiente.current = false;
+      setTimeout(abrirCarrito, 350);
+    } else {
+      setActiveTab('home');
+    }
   };
 
   // Navegación desde la barra inferior de la pantalla de acceso
@@ -129,10 +145,117 @@ function MainHomeScreen() {
   const alAutenticar = (resultado, opciones = {}) => {
     if (resultado?.perfil) setPerfilUsuario(resultado.perfil);
     setAuthMode(null);
-    setActiveTab('home');
+    if (checkoutPendiente.current) {
+      checkoutPendiente.current = false;
+      setTimeout(() => setCheckoutVisible(true), 350);
+    } else {
+      setActiveTab('home');
+    }
     if (opciones.registro) {
       Alert.alert('¡Cuenta creada!', 'Tu cuenta se creó con éxito. Bienvenido a The Outfit.');
     }
+  };
+
+  // ---------- Carrito y compra ----------
+  const abrirCarrito = () => {
+    setActiveTab('cesta');
+    setCarritoVisible(true);
+  };
+
+  const cerrarCarrito = () => {
+    setCarritoVisible(false);
+    setActiveTab('home');
+  };
+
+  // Las pantallas se abren de una en una: se espera a que termine de cerrarse la anterior
+  const navegarDesdeCarrito = (tabId) => {
+    if (tabId === 'cesta') return;
+    setCarritoVisible(false);
+    setTimeout(() => handleTabPress(tabId), 350);
+  };
+
+  // Pasar a pagar exige sesión: si no la hay, se pide y luego se continúa con la compra
+  const iniciarCompra = () => {
+    setCarritoVisible(false);
+    if (!usuario) {
+      checkoutPendiente.current = true;
+      setTimeout(() => setAuthMode('login'), 350);
+      return;
+    }
+    setTimeout(() => setCheckoutVisible(true), 350);
+  };
+
+  const volverAlCarrito = () => {
+    setCheckoutVisible(false);
+    setTimeout(() => setCarritoVisible(true), 350);
+  };
+
+  const navegarDesdeCheckout = (tabId) => {
+    if (tabId === 'cesta') return;
+    setCheckoutVisible(false);
+    setTimeout(() => handleTabPress(tabId), 350);
+  };
+
+  const terminarCompra = () => {
+    setCheckoutVisible(false);
+    setTimeout(irAInicio, 350);
+  };
+
+  const buscarProducto = (id) =>
+    [...productosMujer, ...productosHombre].find((p) => String(p.id) === String(id));
+
+  // Corazón de la cesta: usa el producto completo del catálogo cuando está disponible
+  const toggleFavoritoDeCarrito = (item) => {
+    toggleFavorito(
+      buscarProducto(item.idProducto) || {
+        id: item.idProducto,
+        nombre: item.nombre,
+        imagen: item.imagen,
+        fotos: item.imagen ? [item.imagen] : [],
+        tallas: [item.talla],
+        variantes: [],
+        precio: item.precio,
+        precioOriginal: item.precioOriginal,
+        enOferta: item.enOferta,
+        porcentajeDescuento: item.porcentajeDescuento,
+        idGenero: item.idGenero,
+      }
+    );
+  };
+
+  const abrirProductoDesdeCarrito = (id) => {
+    const producto = buscarProducto(id);
+    if (!producto) return;
+    setCarritoVisible(false);
+    setActiveTab('home');
+    setTimeout(() => abrirDetalleProducto(producto), 350);
+  };
+
+  const agregarAlCarrito = (producto, talla) => {
+    const resultado = carrito.agregar(producto, elegirVariante(producto, talla));
+    if (!resultado.ok) {
+      Alert.alert('No se pudo añadir', resultado.mensaje);
+      return;
+    }
+    Alert.alert('Añadido a la cesta', `${producto.nombre} (${talla})`, [
+      { text: 'Seguir comprando', style: 'cancel' },
+      {
+        text: 'Ver cesta',
+        onPress: () => {
+          if (pdpVisible) cerrarDetalleProducto();
+          if (favoritosVisible) cerrarFavoritos();
+          setTimeout(abrirCarrito, 350);
+        },
+      },
+    ]);
+  };
+
+  // Desde favoritos: si hay una sola talla se añade directo; si no, se abre la ficha para elegirla
+  const agregarRapido = (producto) => {
+    const tallas = [...new Set((producto.variantes || []).map((v) => v.talla))];
+    if (tallas.length === 1) agregarAlCarrito(producto, tallas[0]);
+    else if (tallas.length === 0) Alert.alert('No disponible', 'Esta prenda no está disponible por ahora.');
+    else abrirDetalleProducto(producto);
   };
 
   // Verifica si un producto específico se encuentra en favoritos
@@ -193,6 +316,10 @@ function MainHomeScreen() {
 
   // Estados para la Vista de Menú
   const [menuVisible, setMenuVisible] = useState(false);
+    // nuevo, Estados para abrir pantallas perfil,historial
+  const [perfilVisible, setPerfilVisible] = useState(false);
+  const [historialVisible, setHistorialVisible] = useState(false);
+
   const [generoMenuTab, setGeneroMenuTab] = useState('mujer'); // 'mujer' | 'hombre'
 
   // Función para abrir la vista del Menú
@@ -226,6 +353,8 @@ function MainHomeScreen() {
   // Manejo de pulsación en pestañas de la barra inferior
   const handleTabPress = (tabId) => {
     setActiveTab(tabId);
+       setPerfilVisible(false); 
+    setHistorialVisible(false);
     if (tabId === 'home') {
       irAInicio();
     } else if (tabId === 'menu') {
@@ -235,9 +364,13 @@ function MainHomeScreen() {
       if (menuVisible) cerrarMenu();
       if (favoritosVisible) cerrarFavoritos();
       abrirPerfil();
-    } else {
+    } else if (tabId === 'cesta') {
       if (menuVisible) cerrarMenu();
       if (favoritosVisible) cerrarFavoritos();
+      abrirCarrito();
+    } else {
+      if (menuVisible) cerrarMenu();
+      if (favoritosVisible) cerrarFavoritos()
     }
   };
 
@@ -716,11 +849,7 @@ function MainHomeScreen() {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   style={styles.pdpAddToCartButton}
-                  onPress={() => {
-                    alert(
-                      `¡${productoSeleccionado.nombre} (${tallaSeleccionada || 'Talla única'}) añadido a la cesta!`
-                    );
-                  }}
+                  onPress={() => agregarAlCarrito(productoSeleccionado, tallaSeleccionada)}
                 >
                   <Text style={styles.pdpAddToCartText}>AÑADIR A LA CESTA</Text>
                 </TouchableOpacity>
@@ -872,6 +1001,9 @@ function MainHomeScreen() {
                         } else if (tab.id === 'perfil') {
                           cerrarDetalleProducto();
                           setTimeout(abrirPerfil, 350);
+                        } else if (tab.id === 'cesta') {
+                          cerrarDetalleProducto();
+                          setTimeout(abrirCarrito, 350);
                         } else {
                           setActiveTab(tab.id);
                         }
@@ -920,8 +1052,12 @@ function MainHomeScreen() {
               activeOpacity={0.7}
               onPress={() => {
                 cerrarMenu();
+ 
                 // Espera a que cierre el modal del menú antes de abrir el de acceso
                 setTimeout(abrirPerfil, 350);
+
+               setPerfilVisible(true);
+ 
               }}
               style={styles.menuShortcutItem}
             >
@@ -954,7 +1090,7 @@ function MainHomeScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                alert('Historial de compras');
+                setHistorialVisible(true);
               }}
               style={styles.menuShortcutItem}
             >
@@ -1006,8 +1142,25 @@ function MainHomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* 4. Espacio inferior completamente vacío (por ahora) */}
-          <View style={styles.menuEmptyContent} />
+         
+        {/* 4. Catálogo y filtros - Persona 2 */}
+       <View style={styles.menuEmptyContent}>
+        {cargandoProductos ? (
+       <ActivityIndicator size="large" color="#000000" />
+        ) : (
+       <CatalogoCategorias
+      productosMujer={productosMujer}
+      productosHombre={productosHombre}
+      generoSeleccionado={generoMenuTab}
+      mostrarSelectorGenero={false}
+      onSeleccionarProducto={(producto) => {
+        cerrarMenu();
+        setTimeout(() => abrirDetalleProducto(producto), 350);
+          }}
+         />
+         )}
+         </View>
+
 
           {/* 5. Barra de Navegación Inferior (con MENÚ activo al 0.90 y resto a 0.56) */}
           <View
@@ -1034,6 +1187,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'perfil') {
                         cerrarMenu();
                         setTimeout(abrirPerfil, 350);
+                      } else if (tab.id === 'cesta') {
+                        cerrarMenu();
+                        setTimeout(abrirCarrito, 350);
                       } else {
                         cerrarMenu();
                         setActiveTab(tab.id);
@@ -1208,7 +1364,7 @@ function MainHomeScreen() {
                       activeOpacity={0.7}
                       onPress={(e) => {
                         e?.stopPropagation?.();
-                        alert(`¡${item.nombre} añadido a la cesta!`);
+                        agregarRapido(item);
                       }}
                       style={styles.favCartButton}
                     >
@@ -1262,6 +1418,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'perfil') {
                         cerrarFavoritos();
                         setTimeout(abrirPerfil, 350);
+                      } else if (tab.id === 'cesta') {
+                        cerrarFavoritos();
+                        setTimeout(abrirCarrito, 350);
                       } else {
                         cerrarFavoritos();
                         setActiveTab(tab.id);
@@ -1283,7 +1442,104 @@ function MainHomeScreen() {
             </View>
           </View>
         </SafeAreaView>
+          </Modal>
+            {/* PANTALLA DE PERFIL  */}
+      <Modal
+        visible={perfilVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => { setPerfilVisible(false); setActiveTab('home'); }}
+      >
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+          <View style={{ flex: 1  }}>
+            <PerfilScreen/>
+          </View>
+          
+          {/* Barra de navegación  */}
+          <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={styles.tabButtonsContainer}>
+              {NAV_TABS.map((tab) => {
+                const isSelected = activeTab === tab.id;
+                const currentOpacity = isSelected ? 0.90 : 0.56;
+                return (
+                  <TouchableOpacity key={tab.id} activeOpacity={0.7} 
+                    onPress={() => { 
+                      if (tab.id === 'home') { setPerfilVisible(false); irAInicio(); } 
+                      else if (tab.id === 'menu') { setPerfilVisible(false); abrirMenu(); } 
+                      else { setPerfilVisible(false); setActiveTab(tab.id); }
+                    }} 
+                    style={styles.tabButton}>
+                    <Image source={tab.icon} style={[styles.tabIcon, { opacity: currentOpacity }]} resizeMode="contain" />
+                    <Text style={[styles.tabLabel, { opacity: currentOpacity }]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </SafeAreaView>
       </Modal>
+
+      {/* PANTALLA DE HISTORIAL */}
+      <Modal
+        visible={historialVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => { setHistorialVisible(false); setActiveTab('home'); }}
+      >
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+          <View style={{ flex: 1 }}>
+            <HistorialScreen />
+          </View>
+          
+          <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={styles.tabButtonsContainer}>
+              {NAV_TABS.map((tab) => {
+                const isSelected = activeTab === tab.id;
+                const currentOpacity = isSelected ? 0.90 : 0.56;
+                return (
+                  <TouchableOpacity key={tab.id} activeOpacity={0.7} 
+                    onPress={() => { 
+                      if (tab.id === 'home') { setHistorialVisible(false); irAInicio(); } 
+                      else if (tab.id === 'menu') { setHistorialVisible(false); abrirMenu(); } 
+                      else { setHistorialVisible(false); setActiveTab(tab.id); }
+                    }} 
+                    style={styles.tabButton}>
+                    <Image source={tab.icon} style={[styles.tabIcon, { opacity: currentOpacity }]} resizeMode="contain" />
+                    <Text style={[styles.tabLabel, { opacity: currentOpacity }]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Cesta y proceso de compra */}
+      <CarritoModal
+        visible={carritoVisible}
+        items={carrito.items}
+        subtotal={carrito.subtotal}
+        onCerrar={cerrarCarrito}
+        onNavegar={navegarDesdeCarrito}
+        onCambiarCantidad={carrito.cambiarCantidad}
+        esFavorito={esFavorito}
+        onToggleFavorito={toggleFavoritoDeCarrito}
+        onAbrirProducto={abrirProductoDesdeCarrito}
+        onContinuar={iniciarCompra}
+      />
+      <CheckoutModal
+        visible={checkoutVisible}
+        usuario={usuario}
+        perfil={perfilUsuario}
+        items={carrito.items}
+        subtotal={carrito.subtotal}
+        onVolverCarrito={volverAlCarrito}
+        onNavegar={navegarDesdeCheckout}
+        onCompraCompletada={carrito.vaciar}
+        onFinalizar={terminarCompra}
+      />
 
       {/* Pantalla de perfil del usuario */}
       <ProfileModal
@@ -1330,7 +1586,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <MainHomeScreen />
+      <CarritoProvider>
+        <MainHomeScreen />
+      </CarritoProvider>
     </SafeAreaProvider>
   );
 }
