@@ -21,7 +21,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import HistorialScreen from './src/app/historial';
-import PerfilScreen from './src/app/perfil';
 import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
@@ -76,7 +75,8 @@ function MainHomeScreen() {
   const [usuario, setUsuario] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState(null);
   const [authMode, setAuthMode] = useState(null);
-  const [miperfilVisible, setmiPerfilVisible] = useState(false);
+  const [perfilVisible, setPerfilVisible] = useState(false);
+  const [historialVisible, setHistorialVisible] = useState(false);
 
   // Carrito y proceso de compra
   const carrito = useCarrito();
@@ -252,9 +252,11 @@ function MainHomeScreen() {
 
   // Desde favoritos: si hay una sola talla se añade directo; si no, se abre la ficha para elegirla
   const agregarRapido = (producto) => {
-    const tallas = [...new Set((producto.variantes || []).map((v) => v.talla))];
-    if (tallas.length === 1) agregarAlCarrito(producto, tallas[0]);
-    else if (tallas.length === 0) Alert.alert('No disponible', 'Esta prenda no está disponible por ahora.');
+    const tallasValidas = (producto?.tallas || []).filter(
+      (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
+    );
+    if (tallasValidas.length === 1) agregarAlCarrito(producto, tallasValidas[0]);
+    else if (tallasValidas.length === 0) Alert.alert('No disponible', 'No hay tallas disponibles por el momento.');
     else abrirDetalleProducto(producto);
   };
 
@@ -316,9 +318,6 @@ function MainHomeScreen() {
 
   // Estados para la Vista de Menú
   const [menuVisible, setMenuVisible] = useState(false);
-    // nuevo, Estados para abrir pantallas perfil,historial
-  const [perfilVisible, setPerfilVisible] = useState(false);
-  const [historialVisible, setHistorialVisible] = useState(false);
 
   const [generoMenuTab, setGeneroMenuTab] = useState('mujer'); // 'mujer' | 'hombre'
 
@@ -414,7 +413,10 @@ function MainHomeScreen() {
   const abrirDetalleProducto = (item) => {
     setProductoSeleccionado(item);
     setActivePhotoIndex(0);
-    setTallaSeleccionada(item.tallas?.[0] || 'M');
+    const tallasValidas = (item?.tallas || []).filter(
+      (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
+    );
+    setTallaSeleccionada(tallasValidas.length > 0 ? tallasValidas[0] : null);
     setAcordeonAbierto(null);
     setPdpVisible(true);
   };
@@ -525,6 +527,12 @@ function MainHomeScreen() {
     if (filtroFavoritos === 'HOMBRE') return Number(item.idGenero) === 57;
     return true;
   });
+
+  // Tallas disponibles para la prenda abierta en el modal de detalles
+  const tallasPdpDisponibles = (productoSeleccionado?.tallas || []).filter(
+    (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
+  );
+  const tieneTallasPdp = tallasPdpDisponibles.length > 0;
 
   return (
     <View style={styles.mainContainer}>
@@ -815,43 +823,61 @@ function MainHomeScreen() {
                 {/* Selector de Tallas cargadas desde Firebase */}
                 <View style={styles.tallasBlock}>
                   <Text style={styles.tallasLabel}>TALLAS</Text>
-                  <View style={styles.tallasRow}>
-                    {(productoSeleccionado.tallas?.length > 0
-                      ? productoSeleccionado.tallas
-                      : ['S', 'M', 'L', 'XL']
-                    ).map((talla) => {
-                      const isSelected = tallaSeleccionada === talla;
-                      return (
-                        <TouchableOpacity
-                          key={talla}
-                          activeOpacity={0.7}
-                          onPress={() => setTallaSeleccionada(talla)}
-                          style={[
-                            styles.tallaPill,
-                            isSelected && styles.tallaPillSelected,
-                          ]}
-                        >
-                          <Text
+                  {tieneTallasPdp ? (
+                    <View style={styles.tallasRow}>
+                      {tallasPdpDisponibles.map((talla) => {
+                        const isSelected = tallaSeleccionada === talla;
+                        return (
+                          <TouchableOpacity
+                            key={talla}
+                            activeOpacity={0.7}
+                            onPress={() => setTallaSeleccionada(talla)}
                             style={[
-                              styles.tallaPillText,
-                              isSelected && styles.tallaPillTextSelected,
+                              styles.tallaPill,
+                              isSelected && styles.tallaPillSelected,
                             ]}
                           >
-                            {talla}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                            <Text
+                              style={[
+                                styles.tallaPillText,
+                                isSelected && styles.tallaPillTextSelected,
+                              ]}
+                            >
+                              {talla}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.sinTallasText}>
+                      No hay tallas disponibles por el momento
+                    </Text>
+                  )}
                 </View>
 
                 {/* Botón negro grande: AÑADIR A LA CESTA */}
                 <TouchableOpacity
-                  activeOpacity={0.85}
-                  style={styles.pdpAddToCartButton}
-                  onPress={() => agregarAlCarrito(productoSeleccionado, tallaSeleccionada)}
+                  activeOpacity={tieneTallasPdp ? 0.85 : 0.6}
+                  style={[
+                    styles.pdpAddToCartButton,
+                    !tieneTallasPdp && styles.pdpAddToCartButtonDisabled,
+                  ]}
+                  disabled={!tieneTallasPdp}
+                  onPress={() => {
+                    if (!tieneTallasPdp || !tallaSeleccionada) {
+                      Alert.alert(
+                        'No disponible',
+                        'No hay tallas disponibles por el momento.'
+                      );
+                      return;
+                    }
+                    agregarAlCarrito(productoSeleccionado, tallaSeleccionada);
+                  }}
                 >
-                  <Text style={styles.pdpAddToCartText}>AÑADIR A LA CESTA</Text>
+                  <Text style={styles.pdpAddToCartText}>
+                    {tieneTallasPdp ? 'AÑADIR A LA CESTA' : 'NO DISPONIBLE'}
+                  </Text>
                 </TouchableOpacity>
 
                 {/* Acordeones de Detalles (Colapsables) */}
@@ -1052,12 +1078,7 @@ function MainHomeScreen() {
               activeOpacity={0.7}
               onPress={() => {
                 cerrarMenu();
- 
-                // Espera a que cierre el modal del menú antes de abrir el de acceso
                 setTimeout(abrirPerfil, 350);
-
-               setPerfilVisible(true);
- 
               }}
               style={styles.menuShortcutItem}
             >
@@ -1090,7 +1111,8 @@ function MainHomeScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                setHistorialVisible(true);
+                cerrarMenu();
+                setTimeout(() => setHistorialVisible(true), 350);
               }}
               style={styles.menuShortcutItem}
             >
@@ -1443,42 +1465,6 @@ function MainHomeScreen() {
           </View>
         </SafeAreaView>
           </Modal>
-            {/* PANTALLA DE PERFIL  */}
-      <Modal
-        visible={perfilVisible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => { setPerfilVisible(false); setActiveTab('home'); }}
-      >
-        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-          <View style={{ flex: 1  }}>
-            <PerfilScreen/>
-          </View>
-          
-          {/* Barra de navegación  */}
-          <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <View style={styles.tabButtonsContainer}>
-              {NAV_TABS.map((tab) => {
-                const isSelected = activeTab === tab.id;
-                const currentOpacity = isSelected ? 0.90 : 0.56;
-                return (
-                  <TouchableOpacity key={tab.id} activeOpacity={0.7} 
-                    onPress={() => { 
-                      if (tab.id === 'home') { setPerfilVisible(false); irAInicio(); } 
-                      else if (tab.id === 'menu') { setPerfilVisible(false); abrirMenu(); } 
-                      else { setPerfilVisible(false); setActiveTab(tab.id); }
-                    }} 
-                    style={styles.tabButton}>
-                    <Image source={tab.icon} style={[styles.tabIcon, { opacity: currentOpacity }]} resizeMode="contain" />
-                    <Text style={[styles.tabLabel, { opacity: currentOpacity }]}>{tab.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </SafeAreaView>
-      </Modal>
 
       {/* PANTALLA DE HISTORIAL */}
       <Modal
@@ -2085,6 +2071,13 @@ const styles = StyleSheet.create({
   tallaPillTextSelected: {
     color: '#FFFFFF',
   },
+  sinTallasText: {
+    fontSize: 13,
+    color: '#666666',
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginBottom: 6,
+  },
   pdpAddToCartButton: {
     backgroundColor: '#000000',
     borderRadius: 30,
@@ -2093,6 +2086,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 26,
     marginBottom: 14,
+  },
+  pdpAddToCartButtonDisabled: {
+    backgroundColor: '#B0B0B0',
   },
   pdpAddToCartText: {
     color: '#FFFFFF',

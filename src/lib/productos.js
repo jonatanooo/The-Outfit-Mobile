@@ -102,10 +102,17 @@ export async function obtenerNuevosIngresosPorGenero() {
       const v = doc.data();
       const pid = String(v.ID_Producto);
 
-      // Tallas (las variantes sin talla registrada se muestran como "Única")
-      if (!tallasPorProducto[pid]) tallasPorProducto[pid] = new Set();
-      const nombreTalla = tallaMap[v.ID_Talla] || 'Única';
-      tallasPorProducto[pid].add(nombreTalla);
+      // Tallas disponibles (descartar valores nulos, vacíos o que representen 'única'/'talla única')
+      const rawTalla = tallaMap[v.ID_Talla] || v.Talla || v.talla || null;
+      const esTallaInvalida =
+        !rawTalla ||
+        /^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(rawTalla).trim());
+      const nombreTalla = esTallaInvalida ? null : String(rawTalla).trim();
+
+      if (nombreTalla) {
+        if (!tallasPorProducto[pid]) tallasPorProducto[pid] = new Set();
+        tallasPorProducto[pid].add(nombreTalla);
+      }
 
       // Variantes comprables (talla/color/precio/stock)
       const idVariante = v.ID_Variante ?? doc.id;
@@ -168,11 +175,12 @@ export async function obtenerNuevosIngresosPorGenero() {
         ? (precioInfo.precioFinal < precioOriginal ? precioInfo.precioFinal : +(precioOriginal * (1 - pctDesc / 100)).toFixed(2))
         : precioOriginal;
 
-      // Tallas ordenadas
-      let tallas = tallasPorProducto[pid] ? Array.from(tallasPorProducto[pid]) : [];
-      if (tallas.length === 0) {
-        tallas = ['S', 'M', 'L', 'XL'];
-      }
+      // Tallas ordenadas (sin fallbacks ficticios ni tallas únicas)
+      let tallas = tallasPorProducto[pid]
+        ? Array.from(tallasPorProducto[pid]).filter(
+            (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
+          )
+        : [];
       const ordenTallas = { 'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5, 'XXL': 6 };
       tallas.sort((a, b) => (ordenTallas[a] || 99) - (ordenTallas[b] || 99));
 
