@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../firebase'; // archivo de conexión
 
-export default function HistorialScreen() {
+export default function HistorialScreen({ onVolver }: { onVolver?: () => void }) {
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any>(null);
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -145,6 +145,11 @@ export default function HistorialScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        {onVolver && (
+          <TouchableOpacity style={styles.botonVolver} onPress={onVolver} hitSlop={12}>
+            <Text style={styles.flechaVolver}>←</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.titulo}>HISTORIAL DE COMPRAS</Text>
       </View>
 
@@ -182,6 +187,8 @@ export default function HistorialScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { paddingTop: 20, paddingBottom: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  botonVolver: { position: 'absolute', left: 8, top: 0, bottom: 0, width: 44, alignItems: 'center', justifyContent: 'center' },
+  flechaVolver: { fontSize: 26, color: '#000' },
   titulo: { fontSize: 20, fontWeight: 'bold', letterSpacing: 2, color: '#000' },
   listaContainer: { padding: 20 },
   tarjetaPedido: { flexDirection: 'row', alignItems: 'center', marginBottom: 25, justifyContent: 'space-between' },

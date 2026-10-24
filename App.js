@@ -321,6 +321,7 @@ function MainHomeScreen() {
   const [historialVisible, setHistorialVisible] = useState(false);
 
   const [generoMenuTab, setGeneroMenuTab] = useState('mujer'); // 'mujer' | 'hombre'
+  const [enCategoriaMenu, setEnCategoriaMenu] = useState(false); // true cuando se ve el listado de una categoría
 
   // Función para abrir la vista del Menú
   const abrirMenu = () => {
@@ -1040,34 +1041,21 @@ function MainHomeScreen() {
         <SafeAreaView edges={['top']} style={styles.menuScreenContainer}>
           <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
+          {/* Al entrar a una categoría se oculta todo el encabezado del menú */}
+          {!enCategoriaMenu && (
+          <>
           {/* 1. Encabezado con título centrado MENÚ */}
           <View style={styles.menuHeaderContainer}>
             <Text style={styles.menuHeaderTitle}>MENÚ</Text>
           </View>
 
-          {/* 2. Accesos Directos (PERFIL, FAVORITOS, HISTORIAL) */}
+          {/* 2. Accesos Directos (PRODUCTOS, FAVORITOS, HISTORIAL) */}
           <View style={styles.menuShortcutsRow}>
-            {/* PERFIL */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                cerrarMenu();
- 
-                // Espera a que cierre el modal del menú antes de abrir el de acceso
-                setTimeout(abrirPerfil, 350);
-
-               setPerfilVisible(true);
- 
-              }}
-              style={styles.menuShortcutItem}
-            >
-              <Image
-                source={require('./assets/ICONOS/Person.png')}
-                style={[styles.menuShortcutIcon, { tintColor: '#000000' }]}
-                resizeMode="contain"
-              />
-              <Text style={styles.menuShortcutLabel}>PERFIL</Text>
-            </TouchableOpacity>
+            {/* PRODUCTOS (pestaña activa: aquí están Mujer / Hombre y las categorías) */}
+            <View style={[styles.menuShortcutItem, styles.menuShortcutItemActivo]}>
+              <Ionicons name="shirt-outline" size={28} color="#000000" />
+              <Text style={styles.menuShortcutLabel}>PRODUCTOS</Text>
+            </View>
 
             {/* FAVORITOS */}
             <TouchableOpacity
@@ -1141,8 +1129,10 @@ function MainHomeScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+          </>
+          )}
 
-         
+
         {/* 4. Catálogo y filtros - Persona 2 */}
        <View style={styles.menuEmptyContent}>
         {cargandoProductos ? (
@@ -1153,6 +1143,9 @@ function MainHomeScreen() {
       productosHombre={productosHombre}
       generoSeleccionado={generoMenuTab}
       mostrarSelectorGenero={false}
+      onCategoriaAbierta={setEnCategoriaMenu}
+      esFavorito={esFavorito}
+      onToggleFavorito={toggleFavorito}
       onSeleccionarProducto={(producto) => {
         cerrarMenu();
         setTimeout(() => abrirDetalleProducto(producto), 350);
@@ -1228,6 +1221,17 @@ function MainHomeScreen() {
 
           {/* 1. Encabezado con título centrado FAVORITOS */}
           <View style={styles.favoritosHeaderContainer}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              hitSlop={12}
+              style={styles.favoritosBackButton}
+              onPress={() => {
+                cerrarFavoritos();
+                abrirMenu();
+              }}
+            >
+              <Text style={styles.favoritosBackArrow}>←</Text>
+            </TouchableOpacity>
             <Text style={styles.favoritosHeaderTitle}>FAVORITOS</Text>
           </View>
 
@@ -1490,7 +1494,12 @@ function MainHomeScreen() {
         <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
           <View style={{ flex: 1 }}>
-            <HistorialScreen />
+            <HistorialScreen
+              onVolver={() => {
+                setHistorialVisible(false);
+                abrirMenu();
+              }}
+            />
           </View>
           
           <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -2172,6 +2181,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    paddingBottom: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  menuShortcutItemActivo: {
+    borderBottomColor: '#000000',
   },
   menuShortcutIcon: {
     width: 28,
@@ -2227,6 +2242,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#B0B0B0',
     backgroundColor: '#FFFFFF',
+  },
+  favoritosBackButton: {
+    position: 'absolute',
+    left: 8,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favoritosBackArrow: {
+    fontSize: 26,
+    color: '#000000',
   },
   favoritosHeaderTitle: {
     fontSize: 22,
