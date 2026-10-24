@@ -39,12 +39,14 @@ const HERO_SLIDES = [
   {
     id: 'slide-1',
     image: require('./assets/chicafondoazul.jpg'),
-    tag: 'SUMMER SEASON',
+    tag: 'MUJER',
+    genero: 'mujer',
   },
   {
     id: 'slide-2',
     image: require('./assets/imagen.jpg'),
-    tag: 'SUMMER SEASON',
+    tag: 'HOMBRE',
+    genero: 'hombre',
   },
 ];
 
@@ -357,9 +359,11 @@ function MainHomeScreen() {
 
   const [generoMenuTab, setGeneroMenuTab] = useState('mujer'); // 'mujer' | 'hombre'
   const [enCategoriaMenu, setEnCategoriaMenu] = useState(false); // true cuando se ve el listado de una categoría
+  const [menuVerTodo, setMenuVerTodo] = useState(false); // true cuando el menú se abre directo en "Ver todo"
 
   // Función para abrir la vista del Menú
-  const abrirMenu = () => {
+  const abrirMenu = (verTodo = false) => {
+    setMenuVerTodo(verTodo === true);
     setActiveTab('menu');
     setMenuVisible(true);
   };
@@ -876,10 +880,17 @@ function MainHomeScreen() {
                     style={styles.heroImage}
                     resizeMode="cover"
                   />
-                  {/* Caja rectangular blanca sobrepuesta */}
-                  <View style={styles.heroOverlayBox}>
+                  {/* Caja blanca sobrepuesta: lleva a "Ver todo" del género de la foto */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setGeneroMenuTab(item.genero);
+                      abrirMenu(true);
+                    }}
+                    style={styles.heroOverlayBox}
+                  >
                     <Text style={styles.heroOverlayText}>{item.tag}</Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
               )}
             />
@@ -1474,6 +1485,7 @@ function MainHomeScreen() {
       generoSeleccionado={generoMenuTab}
       mostrarSelectorGenero={false}
       onCategoriaAbierta={setEnCategoriaMenu}
+      iniciarEnVerTodo={menuVerTodo}
       esFavorito={esFavorito}
       onToggleFavorito={toggleFavorito}
       onSeleccionarProducto={(producto) => {
