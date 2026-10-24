@@ -1,5 +1,5 @@
  
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   StatusBar,
   Modal,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
@@ -47,6 +48,15 @@ const HERO_SLIDES = [
   },
 ];
 
+// Función para normalizar texto eliminando acentos y espacios
+function normalizarTexto(texto) {
+  return String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 // Configuración de los 5 botones de la barra de navegación inferior
 const NAV_TABS = [
   { id: 'home', label: 'HOME', icon: require('./assets/ICONOS/Home.png') },
@@ -64,6 +74,32 @@ function MainHomeScreen() {
   const [productosMujer, setProductosMujer] = useState([]);
   const [productosHombre, setProductosHombre] = useState([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
+
+  // Estados para la pestaña de Buscador
+  const [textoBusqueda, setTextoBusqueda] = useState('');
+
+  // Estados para la ventanita modal de selección rápida de talla (carrito)
+  const [modalTallasVisible, setModalTallasVisible] = useState(false);
+  const [productoParaTallas, setProductoParaTallas] = useState(null);
+
+  const abrirModalTallas = (producto) => {
+    const tallasValidas = (producto?.tallas || []).filter(
+      (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
+    );
+
+    if (tallasValidas.length === 0) {
+      Alert.alert('No disponible', 'No hay tallas disponibles por el momento para esta prenda.');
+      return;
+    }
+
+    setProductoParaTallas(producto);
+    setModalTallasVisible(true);
+  };
+
+  const cerrarModalTallas = () => {
+    setModalTallasVisible(false);
+    setProductoParaTallas(null);
+  };
 
   // Sistema Global de Favoritos (preparado para vinculación futura a Firebase Auth / Firestore)
   const [favoritos, setFavoritos] = useState([]);
@@ -356,6 +392,10 @@ function MainHomeScreen() {
     setHistorialVisible(false);
     if (tabId === 'home') {
       irAInicio();
+    } else if (tabId === 'buscar') {
+      if (menuVisible) cerrarMenu();
+      if (favoritosVisible) cerrarFavoritos();
+      setActiveTab('buscar');
     } else if (tabId === 'menu') {
       if (favoritosVisible) cerrarFavoritos();
       abrirMenu();
@@ -369,7 +409,7 @@ function MainHomeScreen() {
       abrirCarrito();
     } else {
       if (menuVisible) cerrarMenu();
-      if (favoritosVisible) cerrarFavoritos()
+      if (favoritosVisible) cerrarFavoritos();
     }
   };
 
@@ -534,129 +574,389 @@ function MainHomeScreen() {
   );
   const tieneTallasPdp = tallasPdpDisponibles.length > 0;
 
-  return (
-    <View style={styles.mainContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+  // Catálogo completo de todos los productos disponibles
+  const todosLosProductos = useMemo(() => {
+    const mapa = new Map();
+    [...productosMujer, ...productosHombre].forEach((p) => {
+      if (p?.id && !mapa.has(String(p.id))) {
+        mapa.set(String(p.id), p);
+      }
+    });
+    return Array.from(mapa.values());
+  }, [productosMujer, productosHombre]);
 
-      {/* ScrollView Principal */}
-      <ScrollView
-        ref={mainScrollRef}
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, 16) + 75 },
-        ]}
-        showsVerticalScrollIndicator={false}
+  // Prendas recomendadas (priorizando ofertas y prendas destacadas)
+  const productosRecomendados = useMemo(() => {
+    const conOferta = todosLosProductos.filter((p) => p.enOferta);
+    const sinOferta = todosLosProductos.filter((p) => !p.enOferta);
+    return [...conOferta, ...sinOferta];
+  }, [todosLosProductos]);
+
+  // Resultados de búsqueda en tiempo real sobre todos los productos
+  const resultadosBusqueda = useMemo(() => {
+    const q = normalizarTexto(textoBusqueda);
+    if (!q) return [];
+
+    if (q === 'ofertas' || q === 'oferta' || q === 'descuento' || q === 'descuentos') {
+      return todosLosProductos.filter((p) => p.enOferta);
+    }
+    if (q === 'mujer' || q === 'mujeres' || q === 'dama' || q === 'damas') {
+      return todosLosProductos.filter((p) => Number(p.idGenero) === 56);
+    }
+    if (q === 'hombre' || q === 'hombres' || q === 'caballero' || q === 'caballeros') {
+      return todosLosProductos.filter((p) => Number(p.idGenero) === 57);
+    }
+
+    return todosLosProductos.filter((prod) => {
+      const matchNombre = normalizarTexto(prod.nombre).includes(q);
+      const matchDesc = normalizarTexto(prod.descripcion).includes(q);
+      const matchRef = normalizarTexto(prod.referencia).includes(q);
+      return matchNombre || matchDesc || matchRef;
+    });
+  }, [textoBusqueda, todosLosProductos]);
+
+  // Renderizado de tarjeta de producto en formato cuadrícula (para resultados y recomendaciones)
+  const renderGridCard = (item) => {
+    const esFav = esFavorito(item.id);
+
+    return (
+      <TouchableOpacity
+        key={`search-grid-${item.id}`}
+        activeOpacity={0.9}
+        onPress={() => abrirDetalleProducto(item)}
+        style={styles.favoritoCard}
       >
-        <SafeAreaView edges={['top']} style={styles.safeHeaderArea}>
-          {/* Header clásico centrado 'THE OUTFIT' (tocar vuelve al inicio) */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={irAInicio}
-            style={styles.headerContainer}
-          >
-            <Text style={styles.headerTitle}>THE OUTFIT</Text>
-          </TouchableOpacity>
-        </SafeAreaView>
-
-        {/* Hero Banner (Carrusel Principal Deslizable) */}
-        <View style={styles.carouselWrapper}>
-          <FlatList
-            data={HERO_SLIDES}
-            keyExtractor={(item) => item.id}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={handleScrollHero}
-            scrollEventThrottle={16}
-            renderItem={({ item }) => (
-              <View style={styles.heroSlide}>
-                <Image
-                  source={item.image}
-                  style={styles.heroImage}
-                  resizeMode="cover"
-                />
-                {/* Caja rectangular blanca sobrepuesta */}
-                <View style={styles.heroOverlayBox}>
-                  <Text style={styles.heroOverlayText}>{item.tag}</Text>
-                </View>
-              </View>
-            )}
-          />
-
-          {/* Indicadores de paginación estilo líneas horizontales */}
-          <View style={styles.paginationContainer}>
-            {HERO_SLIDES.map((_, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.paginationLine,
-                  activeSlide === idx
-                    ? styles.paginationLineActive
-                    : styles.paginationLineInactive,
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* Sección Nuevos Ingresos (Conectado a Firebase en 2 filas horizontales) */}
-        <View style={styles.sectionNuevosIngresos}>
-          <Text style={styles.sectionTitle}>NUEVOS INGRESOS</Text>
-
-          {cargandoProductos ? (
-            <View style={styles.loaderArea}>
-              <ActivityIndicator size="small" color="#000000" />
-              <Text style={styles.loaderText}>Cargando colección...</Text>
-            </View>
+        {/* Imagen del producto */}
+        <View style={styles.favoritoImageContainer}>
+          {item.imagen ? (
+            <Image
+              source={{ uri: item.imagen }}
+              style={styles.favoritoImage}
+              resizeMode="cover"
+            />
           ) : (
-            <View style={styles.rowsWrapper}>
-              {/* Fila 1 - Ropa de Mujer (Scroll Horizontal Independiente) */}
-              <FlatList
-                data={productosMujer}
-                keyExtractor={(item) => `mujer-${item.id}`}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                style={styles.horizontalListRow1}
-                contentContainerStyle={styles.horizontalListContent}
-                renderItem={({ item }) => renderProductCard(item)}
-              />
+            <View style={[styles.favoritoImage, styles.imagePlaceholder]}>
+              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
+            </View>
+          )}
 
-              {/* Fila 2 - Ropa de Hombre (Scroll Horizontal Independiente) */}
-              <FlatList
-                data={productosHombre}
-                keyExtractor={(item) => `hombre-${item.id}`}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                style={styles.horizontalListRow2}
-                contentContainerStyle={styles.horizontalListContent}
-                renderItem={({ item }) => renderProductCard(item)}
-              />
+          {/* Badge de porcentaje de descuento */}
+          {item.enOferta && item.porcentajeDescuento > 0 && (
+            <View style={styles.cardDiscountBadge}>
+              <Text style={styles.cardDiscountText}>-{item.porcentajeDescuento}%</Text>
             </View>
           )}
         </View>
 
-        {/* Banner Inferior de ancho completo */}
-        <View style={styles.bottomBannerContainer}>
-          <Image
-            source={require('./assets/imagen.jpg')}
-            style={styles.bottomBannerImage}
-            resizeMode="cover"
-          />
-          {/* Caja rectangular blanca con 'SEASON SALE' */}
-          <View style={styles.bottomBannerOverlayBox}>
-            <Text style={styles.bottomBannerOverlayText}>SEASON SALE</Text>
-          </View>
-        </View>
+        {/* Detalles: Título, Precios y Acciones (Carrito + Corazón) */}
+        <View style={styles.favoritoDetailsRow}>
+          <View style={styles.favoritoTextCol}>
+            <Text
+              style={styles.favoritoTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.nombre.toUpperCase()}
+            </Text>
 
-        {/* Footer simple: 'EL SALVADOR | ESPAÑOL' */}
-        <View style={styles.footerContainer}>
-          <View style={styles.footerRow}>
-            <Ionicons name="globe-outline" size={17} color="#000000" style={styles.globeIcon} />
-            <Text style={styles.footerText}>EL SALVADOR | ESPAÑOL</Text>
+            {item.enOferta ? (
+              <View style={styles.cardPriceRow}>
+                <Text style={styles.cardOriginalPrice}>
+                  ${Number(item.precioOriginal).toFixed(2)}
+                </Text>
+                <Text style={styles.cardOfferPrice}>
+                  ${Number(item.precio).toFixed(2)}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.favoritoPrice}>
+                ${Number(item.precio).toFixed(2)}
+              </Text>
+            )}
+          </View>
+
+          {/* Acciones a la derecha: Carrito con '+' y Corazón */}
+          <View style={styles.favoritoActionsCol}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                abrirModalTallas(item);
+              }}
+              style={styles.favCartButton}
+            >
+              <View style={styles.cartIconBadgeWrap}>
+                <Ionicons name="cart-outline" size={19} color="#000000" />
+                <View style={styles.cartPlusBadge}>
+                  <Text style={styles.cartPlusBadgeText}>+</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                toggleFavorito(item);
+              }}
+              style={styles.favHeartFilledButton}
+            >
+              <Ionicons
+                name={esFav ? 'heart' : 'heart-outline'}
+                size={19}
+                color="#000000"
+              />
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={styles.mainContainer}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+      {activeTab === 'buscar' ? (
+        /* PANTALLA DEDICADA DEL BUSCADOR */
+        <SafeAreaView edges={['top']} style={styles.buscadorScreenContainer}>
+          {/* 1. Encabezado centrado */}
+          <View style={styles.buscadorHeader}>
+            <Text style={styles.buscadorHeaderTitle}>BUSCADOR</Text>
+          </View>
+
+          {/* 2. Barra de Búsqueda Interactiva */}
+          <View style={styles.searchBarWrapper}>
+            <View style={styles.searchBarContainer}>
+              <Ionicons name="search-outline" size={20} color="#666666" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                value={textoBusqueda}
+                onChangeText={setTextoBusqueda}
+                placeholder="Buscar prendas, estilos, referencias..."
+                placeholderTextColor="#888888"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {textoBusqueda.trim().length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setTextoBusqueda('')}
+                  style={styles.searchClearButton}
+                >
+                  <Ionicons name="close-circle" size={18} color="#888888" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* 3. Sugerencias Rápidas de Categorías / Tendencias */}
+          <View style={styles.quickSearchContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickSearchContent}>
+              {['Todos', 'Vestidos', 'Camisas', 'Pantalones', 'Ofertas', 'Mujer', 'Hombre'].map((sug) => {
+                const activo =
+                  (sug === 'Todos' && textoBusqueda === '') ||
+                  textoBusqueda.toLowerCase() === sug.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={sug}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      if (sug === 'Todos') setTextoBusqueda('');
+                      else setTextoBusqueda(sug);
+                    }}
+                    style={[styles.quickSearchChip, activo && styles.quickSearchChipActive]}
+                  >
+                    <Text style={[styles.quickSearchChipText, activo && styles.quickSearchChipTextActive]}>
+                      {sug.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* 4. Lista Dinámica: Resultados de búsqueda o Recomendaciones */}
+          {cargandoProductos ? (
+            <View style={styles.loaderArea}>
+              <ActivityIndicator size="small" color="#000000" />
+              <Text style={styles.loaderText}>Cargando catálogo...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={textoBusqueda.trim().length > 0 ? resultadosBusqueda : productosRecomendados}
+              keyExtractor={(item) => `search-prod-${item.id}`}
+              numColumns={2}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.favoritosGridContent,
+                { paddingBottom: Math.max(insets.bottom, 12) + 75 },
+              ]}
+              ListHeaderComponent={
+                <View style={styles.searchListHeader}>
+                  {textoBusqueda.trim().length > 0 ? (
+                    <Text style={styles.searchSectionTitle}>
+                      RESULTADOS {resultadosBusqueda.length > 0 ? `(${resultadosBusqueda.length})` : ''}
+                    </Text>
+                  ) : (
+                    <View>
+                      <Text style={styles.searchSectionTitle}>RECOMENDACIONES PARA TI</Text>
+                      <Text style={styles.searchSectionSubtitle}>
+                        Descubre prendas destacadas y las últimas tendencias
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              }
+              ListEmptyComponent={
+                textoBusqueda.trim().length > 0 ? (
+                  <View style={styles.buscadorSinResultados}>
+                    <Ionicons name="search-outline" size={44} color="#A0A0A0" />
+                    <Text style={styles.buscadorSinResultadosTitulo}>
+                      No se encontraron prendas con "${textoBusqueda}"
+                    </Text>
+                    <Text style={styles.buscadorSinResultadosSub}>
+                      Intenta buscar por tipo de prenda, color o estilo diferente.
+                    </Text>
+
+                    {/* Recomendaciones sugeridas cuando no hay resultados */}
+                    <View style={{ marginTop: 24, width: '100%' }}>
+                      <Text style={[styles.searchSectionTitle, { textAlign: 'center', marginBottom: 12 }]}>
+                        PRENDAS RECOMENDADAS
+                      </Text>
+                      <View style={styles.searchEmptyRecsGrid}>
+                        {productosRecomendados.slice(0, 4).map((rec) => renderGridCard(rec))}
+                      </View>
+                    </View>
+                  </View>
+                ) : null
+              }
+              renderItem={({ item }) => renderGridCard(item)}
+            />
+          )}
+        </SafeAreaView>
+      ) : (
+        /* ScrollView Principal (HOME) */
+        <ScrollView
+          ref={mainScrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 16) + 75 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <SafeAreaView edges={['top']} style={styles.safeHeaderArea}>
+            {/* Header clásico centrado 'THE OUTFIT' (tocar vuelve al inicio) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={irAInicio}
+              style={styles.headerContainer}
+            >
+              <Text style={styles.headerTitle}>THE OUTFIT</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+
+          {/* Hero Banner (Carrusel Principal Deslizable) */}
+          <View style={styles.carouselWrapper}>
+            <FlatList
+              data={HERO_SLIDES}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={handleScrollHero}
+              scrollEventThrottle={16}
+              renderItem={({ item }) => (
+                <View style={styles.heroSlide}>
+                  <Image
+                    source={item.image}
+                    style={styles.heroImage}
+                    resizeMode="cover"
+                  />
+                  {/* Caja rectangular blanca sobrepuesta */}
+                  <View style={styles.heroOverlayBox}>
+                    <Text style={styles.heroOverlayText}>{item.tag}</Text>
+                  </View>
+                </View>
+              )}
+            />
+
+            {/* Indicadores de paginación estilo líneas horizontales */}
+            <View style={styles.paginationContainer}>
+              {HERO_SLIDES.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.paginationLine,
+                    activeSlide === idx
+                      ? styles.paginationLineActive
+                      : styles.paginationLineInactive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Sección Nuevos Ingresos (Conectado a Firebase en 2 filas horizontales) */}
+          <View style={styles.sectionNuevosIngresos}>
+            <Text style={styles.sectionTitle}>NUEVOS INGRESOS</Text>
+
+            {cargandoProductos ? (
+              <View style={styles.loaderArea}>
+                <ActivityIndicator size="small" color="#000000" />
+                <Text style={styles.loaderText}>Cargando colección...</Text>
+              </View>
+            ) : (
+              <View style={styles.rowsWrapper}>
+                {/* Fila 1 - Ropa de Mujer (Scroll Horizontal Independiente) */}
+                <FlatList
+                  data={productosMujer}
+                  keyExtractor={(item) => `mujer-${item.id}`}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.horizontalListRow1}
+                  contentContainerStyle={styles.horizontalListContent}
+                  renderItem={({ item }) => renderProductCard(item)}
+                />
+
+                {/* Fila 2 - Ropa de Hombre (Scroll Horizontal Independiente) */}
+                <FlatList
+                  data={productosHombre}
+                  keyExtractor={(item) => `hombre-${item.id}`}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.horizontalListRow2}
+                  contentContainerStyle={styles.horizontalListContent}
+                  renderItem={({ item }) => renderProductCard(item)}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Banner Inferior de ancho completo */}
+          <View style={styles.bottomBannerContainer}>
+            <Image
+              source={require('./assets/imagen.jpg')}
+              style={styles.bottomBannerImage}
+              resizeMode="cover"
+            />
+            {/* Caja rectangular blanca con 'SEASON SALE' */}
+            <View style={styles.bottomBannerOverlayBox}>
+              <Text style={styles.bottomBannerOverlayText}>SEASON SALE</Text>
+            </View>
+          </View>
+
+          {/* Footer simple: 'EL SALVADOR | ESPAÑOL' */}
+          <View style={styles.footerContainer}>
+            <View style={styles.footerRow}>
+              <Ionicons name="globe-outline" size={17} color="#000000" style={styles.globeIcon} />
+              <Text style={styles.footerText}>EL SALVADOR | ESPAÑOL</Text>
+            </View>
+          </View>
+        </ScrollView>
+      )}
 
       {/* Barra de Navegación Inferior Anclada (Custom Bottom Tab Bar) */}
       <View
@@ -1030,6 +1330,9 @@ function MainHomeScreen() {
                         } else if (tab.id === 'cesta') {
                           cerrarDetalleProducto();
                           setTimeout(abrirCarrito, 350);
+                        } else if (tab.id === 'buscar') {
+                          cerrarDetalleProducto();
+                          setActiveTab('buscar');
                         } else {
                           setActiveTab(tab.id);
                         }
@@ -1212,6 +1515,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'cesta') {
                         cerrarMenu();
                         setTimeout(abrirCarrito, 350);
+                      } else if (tab.id === 'buscar') {
+                        cerrarMenu();
+                        setActiveTab('buscar');
                       } else {
                         cerrarMenu();
                         setActiveTab(tab.id);
@@ -1386,7 +1692,7 @@ function MainHomeScreen() {
                       activeOpacity={0.7}
                       onPress={(e) => {
                         e?.stopPropagation?.();
-                        agregarRapido(item);
+                        abrirModalTallas(item);
                       }}
                       style={styles.favCartButton}
                     >
@@ -1443,6 +1749,9 @@ function MainHomeScreen() {
                       } else if (tab.id === 'cesta') {
                         cerrarFavoritos();
                         setTimeout(abrirCarrito, 350);
+                      } else if (tab.id === 'buscar') {
+                        cerrarFavoritos();
+                        setActiveTab('buscar');
                       } else {
                         cerrarFavoritos();
                         setActiveTab(tab.id);
@@ -1546,6 +1855,126 @@ function MainHomeScreen() {
         onNavegar={navegarDesdeAuth}
         onAutenticado={alAutenticar}
       />
+
+      {/* Ventanita Modal: Selección rápida de talla para el carrito */}
+      <Modal
+        visible={modalTallasVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cerrarModalTallas}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={cerrarModalTallas}
+          style={styles.modalTallasOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e?.stopPropagation?.()}
+            style={styles.modalTallasContainer}
+          >
+            {/* Header de la ventanita */}
+            <View style={styles.modalTallasHeader}>
+              <Text style={styles.modalTallasTitle}>SELECCIONA TU TALLA</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={cerrarModalTallas}
+                style={styles.modalTallasCloseBtn}
+              >
+                <Ionicons name="close" size={22} color="#000000" />
+              </TouchableOpacity>
+            </View>
+
+            {productoParaTallas && (
+              <View>
+                {/* Resumen del producto con miniatura, nombre y precio */}
+                <View style={styles.modalTallasProdRow}>
+                  {productoParaTallas.imagen ? (
+                    <Image
+                      source={{ uri: productoParaTallas.imagen }}
+                      style={styles.modalTallasThumb}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.modalTallasThumb, styles.imagePlaceholder]}>
+                      <Text style={{ fontSize: 9, color: '#888' }}>Sin foto</Text>
+                    </View>
+                  )}
+                  <View style={styles.modalTallasProdInfo}>
+                    <Text
+                      style={styles.modalTallasProdName}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
+                      {productoParaTallas.nombre?.toUpperCase()}
+                    </Text>
+                    {productoParaTallas.enOferta ? (
+                      <View style={styles.cardPriceRow}>
+                        <Text style={styles.cardOriginalPrice}>
+                          ${Number(productoParaTallas.precioOriginal).toFixed(2)}
+                        </Text>
+                        <Text style={styles.cardOfferPrice}>
+                          ${Number(productoParaTallas.precio).toFixed(2)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.modalTallasProdPrice}>
+                        ${Number(productoParaTallas.precio).toFixed(2)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Selector de tallas disponibles */}
+                <View style={styles.modalTallasListWrapper}>
+                  <Text style={styles.modalTallasSubLabel}>
+                    TALLAS DISPONIBLES:
+                  </Text>
+                  {(() => {
+                    const tallas = (productoParaTallas.tallas || []).filter(
+                      (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
+                    );
+                    if (tallas.length === 0) {
+                      return (
+                        <Text style={styles.sinTallasText}>
+                          No hay tallas disponibles por el momento
+                        </Text>
+                      );
+                    }
+                    return (
+                      <View style={styles.modalTallasRow}>
+                        {tallas.map((talla) => (
+                          <TouchableOpacity
+                            key={`modal-talla-${talla}`}
+                            activeOpacity={0.75}
+                            onPress={() => {
+                              const prod = productoParaTallas;
+                              cerrarModalTallas();
+                              agregarAlCarrito(prod, talla);
+                            }}
+                            style={styles.modalTallaPill}
+                          >
+                            <Text style={styles.modalTallaPillText}>{talla}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    );
+                  })()}
+                </View>
+
+                {/* Botón cancelar */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={cerrarModalTallas}
+                  style={styles.modalTallasCancelBtn}
+                >
+                  <Text style={styles.modalTallasCancelText}>CANCELAR</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -2379,6 +2808,247 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 18,
+  },
+
+  // 10. Estilos de la Pantalla de Buscador
+  buscadorScreenContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  buscadorHeader: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEA',
+    backgroundColor: '#FFFFFF',
+  },
+  buscadorHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2.5,
+    color: '#000000',
+    fontFamily: Platform.select({
+      ios: 'Didot',
+      android: 'serif',
+      default: 'serif',
+    }),
+  },
+  searchBarWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#E2E2E2',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#000000',
+    paddingVertical: 0,
+    fontFamily: Platform.select({
+      ios: 'Helvetica Neue',
+      android: 'sans-serif',
+      default: 'sans-serif',
+    }),
+  },
+  searchClearButton: {
+    padding: 4,
+  },
+  quickSearchContainer: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEA',
+    backgroundColor: '#FFFFFF',
+  },
+  quickSearchContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  quickSearchChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D4D4D4',
+    backgroundColor: '#FFFFFF',
+  },
+  quickSearchChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  quickSearchChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    color: '#555555',
+  },
+  quickSearchChipTextActive: {
+    color: '#FFFFFF',
+  },
+  searchListHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  searchSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: '#000000',
+  },
+  searchSectionSubtitle: {
+    fontSize: 12,
+    color: '#777777',
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  buscadorSinResultados: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+  },
+  buscadorSinResultadosTitulo: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  buscadorSinResultadosSub: {
+    fontSize: 13,
+    color: '#777777',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  searchEmptyRecsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+
+  // 11. Estilos de la Ventanita Modal de Selección de Talla
+  modalTallasOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalTallasContainer: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalTallasHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  modalTallasTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: '#000000',
+  },
+  modalTallasCloseBtn: {
+    padding: 2,
+  },
+  modalTallasProdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    gap: 12,
+  },
+  modalTallasThumb: {
+    width: 52,
+    height: 68,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F5',
+  },
+  modalTallasProdInfo: {
+    flex: 1,
+  },
+  modalTallasProdName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111111',
+    lineHeight: 18,
+  },
+  modalTallasProdPrice: {
+    fontSize: 13,
+    color: '#333333',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  modalTallasListWrapper: {
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  modalTallasSubLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#666666',
+    marginBottom: 10,
+  },
+  modalTallasRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  modalTallaPill: {
+    minWidth: 50,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  modalTallaPillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  modalTallasCancelBtn: {
+    marginTop: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+  },
+  modalTallasCancelText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#888888',
   },
 });
 
