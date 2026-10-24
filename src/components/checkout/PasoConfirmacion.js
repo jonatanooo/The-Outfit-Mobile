@@ -60,7 +60,13 @@ export default function PasoConfirmacion({ resumen }) {
     <ScrollView style={styles.flex} contentContainerStyle={styles.contenido} showsVerticalScrollIndicator={false}>
       <Text style={styles.gracias}>¡GRACIAS POR SU COMPRA!</Text>
       <ListaPrendas items={resumen.items} />
-      <Totales subtotal={resumen.subtotal} envio={resumen.envio} total={resumen.total} />
+      <Totales
+        subtotal={resumen.subtotal}
+        subtotalOriginal={resumen.subtotalOriginal}
+        ahorro={resumen.ahorro}
+        envio={resumen.envio}
+        total={resumen.total}
+      />
 
       <View style={styles.datos}>
         {!!resumen.idPedido && <Dato etiqueta="ID PEDIDO" valor={`#${resumen.idPedido}`} />}
