@@ -22,12 +22,18 @@ import { cargarCategoriasCatalogo } from './cargarCategoriasCatalogo';
 
 
 
+// Valor especial: muestra todas las prendas del género sin filtrar por categoría.
+const VER_TODO = '__VER_TODO__';
+
 export default function CatalogoCategorias({
   productosMujer = [],
   productosHombre = [],
   onSeleccionarProducto,
   generoSeleccionado,
   mostrarSelectorGenero = true,
+  onCategoriaAbierta,
+  esFavorito,
+  onToggleFavorito,
 }) {
   const [generoLocal, setGeneroLocal] = useState('mujer');
 
@@ -188,8 +194,14 @@ if (orden === 'Más nuevo') {
     return resultado;
   }, [productos,filtrosActivos, categoriaPorProducto, fechaPorProducto,]);
 
+  // Avisa al padre cuando se entra o se sale de una categoría (para ocultar su encabezado)
+  useEffect(() => {
+    onCategoriaAbierta?.(categoriaSeleccionada !== null);
+    return () => onCategoriaAbierta?.(false);
+  }, [categoriaSeleccionada]);
+
   // Cambiar categoría Mujer / Hombre
- 
+
 const cambiarGenero = (genero) => {
   setGeneroLocal(genero);
   setFiltrosActivos({});
@@ -237,6 +249,16 @@ useEffect(() => {
     style={styles.listaCategorias}
     showsVerticalScrollIndicator={false}
   >
+    <Pressable
+      style={styles.opcionCategoria}
+      onPress={() => {
+        setCategoriaSeleccionada(VER_TODO);
+        setFiltrosActivos({});
+      }}
+    >
+      <Text style={styles.textoCategoria}>VER TODO</Text>
+    </Pressable>
+
     {categoriasDisponibles.map((categoria) => (
       <Pressable
         key={categoria}
@@ -260,23 +282,28 @@ useEffect(() => {
   // Mostrar las prendas de la categoría seleccionada
   <View style={styles.vistaCategoria}>
 
-    <Pressable
-      style={styles.botonRegresar}
-      onPress={() => {
-        setCategoriaSeleccionada(null);
-        setFiltrosActivos({});
-      }}
-    >
-      <Text style={styles.textoRegresar}>
-        ← CATEGORÍAS
-      </Text>
-    </Pressable>
+    <View style={styles.barraCategoria}>
+      <Pressable
+        style={styles.botonRegresar}
+        hitSlop={12}
+        onPress={() => {
+          setCategoriaSeleccionada(null);
+          setFiltrosActivos({});
+        }}
+      >
+        <Text style={styles.flechaRegresar}>←</Text>
+      </Pressable>
 
-    <Text style={styles.tituloCategoria}>
-      {filtrosActivos.Categorias?.length === 1
-        ? filtrosActivos.Categorias[0].toUpperCase()
-        : 'PRODUCTOS'}
-    </Text>
+      <Text style={styles.tituloCategoria} numberOfLines={1}>
+        {filtrosActivos.Categorias?.length === 1
+          ? filtrosActivos.Categorias[0].toUpperCase()
+          : categoriaSeleccionada === VER_TODO
+            ? generoActivo.toUpperCase()
+            : 'PRODUCTOS'}
+      </Text>
+
+      <View style={styles.botonRegresar} />
+    </View>
 
     <FiltroMenu
       categoriasDisponibles={categoriasDisponibles}
@@ -288,6 +315,8 @@ useEffect(() => {
     <ListadoPrendas
       productos={productosFiltrados}
       onSeleccionarProducto={onSeleccionarProducto}
+      esFavorito={esFavorito}
+      onToggleFavorito={onToggleFavorito}
     />
 
   </View>
@@ -353,24 +382,32 @@ vistaCategoria: {
   backgroundColor: '#FFFFFF',
 },
 
-botonRegresar: {
-  paddingHorizontal: 15,
-  paddingTop: 18,
-  paddingBottom: 10,
+barraCategoria: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 8,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#DDDDDD',
 },
 
-textoRegresar: {
-  fontSize: 14,
-  fontWeight: '600',
+botonRegresar: {
+  width: 44,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+flechaRegresar: {
+  fontSize: 26,
   color: '#000000',
 },
 
 tituloCategoria: {
-  fontSize: 22,
+  flex: 1,
+  textAlign: 'center',
+  fontSize: 18,
   fontWeight: 'bold',
-  marginHorizontal: 15,
-  marginTop: 10,
-  marginBottom: 10,
+  letterSpacing: 1,
   color: '#000000',
 },
 
