@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { FONT, NEGRO, ROJO, VERDE, ListaPrendas, Totales, CampoPastilla } from './ui';
-import { DEPARTAMENTOS, TIENDA_DIRECCION, COSTO_ENVIO_DOMICILIO, ENVIO_GRATIS_DESDE, formatoPrecio } from '../../lib/tienda';
+import { DEPARTAMENTOS, TIENDA_DIRECCION, COSTO_ENVIO_DOMICILIO, ENVIO_GRATIS_DESDE, formatoPrecio, redondear } from '../../lib/tienda';
 import { textoDireccion, validarDireccion } from '../../lib/pedidos';
 
 function Radio({ activo }) {
@@ -107,6 +107,10 @@ export default function PasoEnvio({
 }) {
   const [agregando, setAgregando] = useState(false);
 
+  // Descuento total de la cesta: diferencia entre el precio original y el vigente.
+  const subtotalOriginal = redondear(items.reduce((acc, i) => acc + (i.precioOriginal || i.precio) * i.cantidad, 0));
+  const ahorro = redondear(subtotalOriginal - subtotal);
+
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.contenido} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.tarjeta}>
@@ -161,7 +165,7 @@ export default function PasoEnvio({
       </View>
 
       <ListaPrendas items={items} />
-      <Totales subtotal={subtotal} envio={envio} total={total} />
+      <Totales subtotal={subtotal} subtotalOriginal={subtotalOriginal} ahorro={ahorro} envio={envio} total={total} />
     </ScrollView>
   );
 }
