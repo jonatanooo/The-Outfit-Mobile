@@ -36,7 +36,7 @@ Misma estructura que usaba la versión web:
 | Método | Campo | Formato |
 |---|---|---|
 | Tarjeta | Número | 16 dígitos (15 si empieza con 34 o 37), se agrupa al escribir; cualquier número vale |
-| Tarjeta | Fecha de caducidad | `DD/MM/YY` con una fecha de calendario posible (no se exige que sea futura) |
+| Tarjeta | Fecha de caducidad | `MM/AA` con mes 01-12; se rechaza si la tarjeta ya está vencida |
 | Tarjeta | CVV | 3 dígitos (4 en American Express) |
 | Tarjeta | Titular | Solo letras y espacios (mín. 3 caracteres) |
 | PayPal | Correo y contraseña | Correo con formato válido y contraseña de 6+ caracteres |

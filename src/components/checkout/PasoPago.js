@@ -71,12 +71,12 @@ function FormTarjeta({ onSubmit, errores, setErrores, registrar }) {
         <TextInput
           ref={fechaRef}
           style={styles.input}
-          placeholder="FECHA DE CADUCIDAD (DD/MM/YY)"
+          placeholder="FECHA DE CADUCIDAD (MM/AA)"
           placeholderTextColor={PLACEHOLDER}
           value={datos.fecha}
           onChangeText={(v) => cambiar('fecha', formatearFechaCaducidad(v))}
           keyboardType="number-pad"
-          maxLength={8}
+          maxLength={5}
           returnKeyType="next"
           onSubmitEditing={() => cvvRef.current?.focus()}
         />
