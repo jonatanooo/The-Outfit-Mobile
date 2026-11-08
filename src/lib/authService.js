@@ -1,4 +1,4 @@
-import { Platform, TurboModuleRegistry, NativeModules, Alert } from 'react-native';
+import { Platform, TurboModuleRegistry, NativeModules } from 'react-native';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -139,8 +139,7 @@ export async function recuperarPassword(correo) {
 
 // ---------- Google ----------
 // En web se usa el popup de Firebase. En Android/iOS se usa Google Sign-In nativo
-// cuando se ejecuta un development build (npx expo run:android).
-// En Expo Go (sin binario nativo), se ofrece un modo demo o alerta guiada para evitar crash.
+// cuando la app es un build nativo (APK). En Expo Go no hay binario nativo y se avisa al usuario.
 const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   '317665000506-7nh1dr5smdo6lpevda7gao8ki859gopf.apps.googleusercontent.com';
@@ -166,48 +165,6 @@ function cargarGoogleNativo() {
   }
 }
 
-export async function iniciarSesionDemoGoogle() {
-  const correoDemo = 'usuario.google.demo@theoutfit.com';
-  const passwordDemo = 'GoogleDemo2026!';
-  let user;
-
-  try {
-    const cred = await signInWithEmailAndPassword(auth, correoDemo, passwordDemo);
-    user = cred.user;
-  } catch (error) {
-    if (
-      error.code === 'auth/user-not-found' ||
-      error.code === 'auth/invalid-credential' ||
-      error.code === 'auth/wrong-password'
-    ) {
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, correoDemo, passwordDemo);
-        user = cred.user;
-        await updateProfile(user, { displayName: 'Usuario Google (Demo)' });
-      } catch (errCrear) {
-        if (errCrear.code === 'auth/email-already-in-use') {
-          const cred = await signInWithEmailAndPassword(auth, correoDemo, passwordDemo);
-          user = cred.user;
-        } else {
-          throw errCrear;
-        }
-      }
-    } else {
-      throw error;
-    }
-  }
-
-  let perfil = await buscarPerfil(user);
-  if (!perfil) {
-    perfil = await crearPerfil(user, {
-      nombres: user.displayName || 'Usuario Google (Demo)',
-      username: 'usuario_google',
-    });
-  }
-  await rechazarSiBaneado(perfil);
-  return { user, perfil };
-}
-
 // Devuelve null si el usuario cancela el flujo o { user, perfil } al autenticarse.
 export async function continuarConGoogle() {
   if (Platform.OS === 'web') {
@@ -221,32 +178,10 @@ export async function continuarConGoogle() {
 
   const modulo = cargarGoogleNativo();
   if (!modulo || !modulo.GoogleSignin) {
-    // Detectado Expo Go o build sin el módulo nativo compilado
-    return new Promise((resolve) => {
-      Alert.alert(
-        'Google Sign-In en Expo Go',
-        'El inicio de sesión nativo con Google requiere compilar la app con "npx expo run:android" (Development Build), ya que Expo Go no contiene los binarios de Google Play Services.\n\n¿Deseas ingresar en Modo Demo (Google) para probar la app en Expo Go?',
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-            onPress: () => resolve(null),
-          },
-          {
-            text: 'Entrar en Modo Demo',
-            onPress: async () => {
-              try {
-                const res = await iniciarSesionDemoGoogle();
-                resolve(res);
-              } catch (e) {
-                Alert.alert('Error Demo', e.message || 'No se pudo iniciar en modo demo.');
-                resolve(null);
-              }
-            },
-          },
-        ]
-      );
-    });
+    // Expo Go o build sin el módulo nativo: Google no está disponible.
+    throw new AuthError(
+      'Google no está disponible en esta versión de la app. Inicia sesión con tu correo y contraseña.'
+    );
   }
 
   if (!GOOGLE_WEB_CLIENT_ID) {
