@@ -13,6 +13,7 @@ export default function FiltroMenu({
   categoriasDisponibles = [],
   generosDisponibles = [], // solo en Ofertas y Winter Season (mezclan hombre y mujer)
   coloresDisponibles = [], // colores que existen en las prendas que se están viendo
+  hexPorColor = {}, // { 'Rosa': '#f690a4' }: color real para dibujar el círculo
   tallasDisponibles = [], // tallas que existen en las prendas que se están viendo
   filtrosActivos = {},
   cantidadResultados = 0,
@@ -170,10 +171,20 @@ export default function FiltroMenu({
                         ] || []
                       ).includes(opcion);
 
+                    const hex =
+                      seccion.titulo === 'Colores' ? hexPorColor[opcion] : null;
+                    const marca = seleccionado
+                      ? seccion.tipo === 'unica'
+                        ? '◉'
+                        : '☑'
+                      : seccion.tipo === 'unica'
+                        ? '○'
+                        : '☐';
+
                     return (
                       <Pressable
                         key={opcion}
-                        style={styles.opcion}
+                        style={[styles.opcion, hex && styles.opcionColor]}
                         onPress={() =>
                           seleccionarFiltro(
                             seccion.titulo,
@@ -182,17 +193,21 @@ export default function FiltroMenu({
                           )
                         }
                       >
-                        <Text style={styles.textoOpcion}>
-                          {seleccionado
-                            ? seccion.tipo === 'unica'
-                              ? '◉'
-                              : '☑'
-                            : seccion.tipo === 'unica'
-                              ? '○'
-                              : '☐'}
-                          {'  '}
-                          {opcion}
-                        </Text>
+                        {hex ? (
+                          <>
+                            <Text style={styles.textoOpcion}>{marca}</Text>
+                            <View
+                              style={[styles.circuloColor, { backgroundColor: hex }]}
+                            />
+                            <Text style={styles.textoOpcion}>{opcion}</Text>
+                          </>
+                        ) : (
+                          <Text style={styles.textoOpcion}>
+                            {marca}
+                            {'  '}
+                            {opcion}
+                          </Text>
+                        )}
                       </Pressable>
                     );
                   })}
@@ -294,6 +309,18 @@ const styles = StyleSheet.create({
   },
   opcion: {
     paddingVertical: 9,
+  },
+  opcionColor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circuloColor: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    marginHorizontal: 10,
   },
   textoOpcion: {
     fontSize: 15,

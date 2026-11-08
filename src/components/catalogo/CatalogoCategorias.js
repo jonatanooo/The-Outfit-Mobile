@@ -135,6 +135,17 @@ useEffect(() => {
     [productos]
   );
 
+  // Color real (hex) de cada color disponible, para dibujar el círculo en el filtro.
+  const hexPorColor = useMemo(() => {
+    const mapa = {};
+    productos.forEach((p) =>
+      (p.variantes || []).forEach((v) => {
+        if (v.color && v.colorHex && !mapa[v.color]) mapa[v.color] = v.colorHex;
+      })
+    );
+    return mapa;
+  }, [productos]);
+
   const tallasDisponibles = useMemo(
     () =>
       unicos(
@@ -418,6 +429,7 @@ useEffect(() => {
       categoriasDisponibles={categoriasDisponibles}
       generosDisponibles={generosDisponibles}
       coloresDisponibles={coloresDisponibles}
+      hexPorColor={hexPorColor}
       tallasDisponibles={tallasDisponibles}
       filtrosActivos={filtrosActivos}
       cantidadResultados={productosFiltrados.length}

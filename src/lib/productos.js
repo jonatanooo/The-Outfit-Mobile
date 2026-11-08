@@ -51,9 +51,13 @@ export async function obtenerNuevosIngresosPorGenero() {
         (stockPorVariante[String(inv.ID_Variante)] || 0) + Number(inv.Cantidad_Disponible || 0);
     });
     const colorMap = {};
+    const colorHexMap = {}; // código hexadecimal del color (Codigo_Hex), para mostrarlo en el filtro
     colorSnap.docs.forEach((d) => {
       const c = d.data();
       if (c.Nombre_Color) colorMap[String(c.ID_Color ?? d.id)] = c.Nombre_Color;
+      if (c.Nombre_Color && /^#[0-9a-fA-F]{3,8}$/.test(String(c.Codigo_Hex || '').trim())) {
+        colorHexMap[String(c.ID_Color ?? d.id)] = String(c.Codigo_Hex).trim();
+      }
     });
 
     // 1. Mapear CategoriaPadre por ID_Categoria
@@ -124,6 +128,7 @@ export async function obtenerNuevosIngresosPorGenero() {
         id: idVariante,
         talla: nombreTalla,
         color: v.ID_Color != null ? colorMap[String(v.ID_Color)] || '' : '',
+        colorHex: v.ID_Color != null ? colorHexMap[String(v.ID_Color)] || null : null,
         stock: stockPorVariante[String(idVariante)] ?? 0,
         ...calcularPrecioVariante(v),
       });
