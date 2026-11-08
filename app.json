@@ -47,6 +47,12 @@
         "projectId": "d23ec163-451b-4ebc-9916-51562e96ae64"
       }
     },
-    "owner": "ezequiel123_321"
+    "owner": "ezequiel123_321",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d23ec163-451b-4ebc-9916-51562e96ae64"
+    }
   }
 }

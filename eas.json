@@ -11,7 +11,8 @@
       },
       "env": {
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "317665000506-7nh1dr5smdo6lpevda7gao8ki859gopf.apps.googleusercontent.com"
-      }
+      },
+      "channel": "apk"
     }
   }
 }
