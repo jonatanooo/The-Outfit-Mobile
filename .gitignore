@@ -49,3 +49,6 @@ serviceAccountKey.json
 # Firebase / Google Sign-In (config local)
 google-services.json
 .env
+
+# credenciales locales de firma
+credentials.json
