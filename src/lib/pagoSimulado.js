@@ -49,21 +49,27 @@ export function validarNumeroTarjeta(valor) {
   return '';
 }
 
-// DD/MM/YY mientras se escribe
+// MM/AA mientras se escribe. El mes se limita a 01-12: un primer dígito de 2 a 9 se completa
+// con un cero delante y un segundo dígito que daría un mes inválido (00, 13, 55...) se descarta.
 export function formatearFechaCaducidad(valor) {
-  const n = soloDigitos(valor, 6);
-  return [n.slice(0, 2), n.slice(2, 4), n.slice(4, 6)].filter(Boolean).join('/');
+  let n = soloDigitos(valor, 4);
+  if (n[0] >= '2') n = `0${n}`.slice(0, 4);
+  if (n.length >= 2) {
+    const mes = Number(n.slice(0, 2));
+    if (mes < 1 || mes > 12) n = n[0] + n.slice(2);
+  }
+  return [n.slice(0, 2), n.slice(2, 4)].filter(Boolean).join('/');
 }
 
-// Solo formato DD/MM/YY con una fecha de calendario posible (no se exige que sea futura).
-export function validarFechaCaducidad(valor) {
-  const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(valor || '');
-  if (!m) return 'Usa el formato DD/MM/YY';
-  const dia = Number(m[1]);
-  const mes = Number(m[2]);
-  const fecha = new Date(2000 + Number(m[3]), mes - 1, dia);
-  if (mes < 1 || mes > 12 || dia < 1 || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
-    return 'La fecha no es válida';
+// Formato MM/AA con mes 01-12. La tarjeta vale hasta el último día del mes indicado.
+export function validarFechaCaducidad(valor, ahora = new Date()) {
+  const m = /^(\d{2})\/(\d{2})$/.exec(valor || '');
+  if (!m) return 'Usa el formato MM/AA';
+  const mes = Number(m[1]);
+  const anio = 2000 + Number(m[2]);
+  if (mes < 1 || mes > 12) return 'El mes debe estar entre 01 y 12';
+  if (anio < ahora.getFullYear() || (anio === ahora.getFullYear() && mes < ahora.getMonth() + 1)) {
+    return 'La tarjeta está vencida';
   }
   return '';
 }
