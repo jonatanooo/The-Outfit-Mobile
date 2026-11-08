@@ -14,6 +14,8 @@ export default function ListadoPrendas({
   onSeleccionarProducto,
   esFavorito,
   onToggleFavorito,
+  paddingInferior = 12, // espacio al final para que la barra inferior no tape la última fila
+  mensajeVacio = 'No hay prendas para mostrar.',
 }) {
   const renderPrenda = ({ item }) => {
     const enOferta = item.enOferta && Number(item.porcentajeDescuento) > 0;
@@ -94,10 +96,10 @@ export default function ListadoPrendas({
       extraData={esFavorito}
       numColumns={2}
       columnWrapperStyle={styles.fila}
-      contentContainerStyle={styles.contenedor}
+      contentContainerStyle={[styles.contenedor, { paddingBottom: paddingInferior }]}
       ListEmptyComponent={
         <Text style={styles.mensaje}>
-          No hay prendas para mostrar.
+          {mensajeVacio}
         </Text>
       }
     />

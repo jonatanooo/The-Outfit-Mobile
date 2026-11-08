@@ -1,6 +1,7 @@
 
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 
@@ -18,12 +19,19 @@ import FiltroMenu from './FiltroMenu';
 import ListadoPrendas from './ListadoPrendas';
 
 import { cargarCategoriasCatalogo } from './cargarCategoriasCatalogo';
+import { ID_TEMPORADA_INVIERNO } from '../../lib/productos';
 
 
 
 
 // Valor especial: muestra todas las prendas del género sin filtrar por categoría.
 const VER_TODO = '__VER_TODO__';
+// Vistas especiales que mezclan hombre y mujer y se filtran por género.
+const OFERTAS = '__OFERTAS__';
+const WINTER = '__WINTER__';
+
+const ORDEN_TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const unicos = (lista) => [...new Set(lista.filter(Boolean))];
 
 export default function CatalogoCategorias({
   productosMujer = [],
@@ -33,6 +41,7 @@ export default function CatalogoCategorias({
   mostrarSelectorGenero = true,
   onCategoriaAbierta,
   iniciarEnVerTodo = false,
+  iniciarEnColeccion = null, // { coleccion: 'ofertas' | 'invierno', genero: 'mujer' | 'hombre' | null }
   esFavorito,
   onToggleFavorito,
 }) {
@@ -40,10 +49,22 @@ export default function CatalogoCategorias({
 
   const generoActivo = generoSeleccionado ?? generoLocal;
 
-  const [filtrosActivos, setFiltrosActivos] = useState({});
-  
+  const insets = useSafeAreaInsets();
+  // La barra inferior de la app está sobre el contenido: se deja espacio para no taparlo.
+  const paddingInferior = Math.max(insets.bottom, 12) + 75;
+
+  const [filtrosActivos, setFiltrosActivos] = useState(
+    iniciarEnColeccion?.genero
+      ? { 'Género': [iniciarEnColeccion.genero === 'hombre' ? 'Hombre' : 'Mujer'] }
+      : {}
+  );
+
 const [categoriaSeleccionada, setCategoriaSeleccionada] =
-  useState(iniciarEnVerTodo ? VER_TODO : null);
+  useState(
+    iniciarEnColeccion
+      ? (iniciarEnColeccion.coleccion === 'invierno' ? WINTER : OFERTAS)
+      : iniciarEnVerTodo ? VER_TODO : null
+  );
 
 
 const [categoriaPorProducto, setCategoriaPorProducto] =
@@ -77,19 +98,68 @@ useEffect(() => {
   };
 }, []);
 
-  // Seleccionar los productos según Mujer / Hombre
-  const productos = generoActivo === 'mujer'
-    ? productosMujer
-    : productosHombre;
+  const esColeccion =
+    categoriaSeleccionada === OFERTAS || categoriaSeleccionada === WINTER;
 
- 
-const categoriasDisponibles =
-  categoriasPorGenero[generoActivo] || [];
+  // Ofertas y Winter Season mezclan hombre y mujer; el resto usa el género activo.
+  const productos = useMemo(() => {
+    if (categoriaSeleccionada === OFERTAS) {
+      return [...productosMujer, ...productosHombre].filter((p) => p.enOferta);
+    }
+    if (categoriaSeleccionada === WINTER) {
+      return [...productosMujer, ...productosHombre].filter(
+        (p) => Number(p.idTemporada) === ID_TEMPORADA_INVIERNO
+      );
+    }
+    return generoActivo === 'mujer' ? productosMujer : productosHombre;
+  }, [categoriaSeleccionada, generoActivo, productosMujer, productosHombre]);
+
+  const idsMujer = useMemo(
+    () => new Set(productosMujer.map((p) => String(p.id))),
+    [productosMujer]
+  );
+
+  const categoriasDisponibles = esColeccion
+    ? unicos([
+        ...(categoriasPorGenero.mujer || []),
+        ...(categoriasPorGenero.hombre || []),
+      ]).sort()
+    : categoriasPorGenero[generoActivo] || [];
+
+  // Colores y tallas que realmente existen en las prendas que se están viendo.
+  const coloresDisponibles = useMemo(
+    () =>
+      unicos(
+        productos.flatMap((p) => (p.variantes || []).map((v) => v.color))
+      ).sort((a, b) => a.localeCompare(b, 'es')),
+    [productos]
+  );
+
+  const tallasDisponibles = useMemo(
+    () =>
+      unicos(
+        productos.flatMap((p) => [
+          ...(p.tallas || []),
+          ...(p.variantes || []).map((v) => v.talla),
+        ])
+      ).sort((a, b) => {
+        const ia = ORDEN_TALLAS.indexOf(a);
+        const ib = ORDEN_TALLAS.indexOf(b);
+        if (ia === -1 && ib === -1) return a.localeCompare(b, 'es');
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      }),
+    [productos]
+  );
+
+  const generosDisponibles = esColeccion ? ['Mujer', 'Hombre'] : [];
 
 
   // Aplicar filtros a las prendas existentes
   const productosFiltrados = useMemo(() => {
     const categorias = filtrosActivos.Categorias || [];
+    const generos = filtrosActivos['Género'] || [];
     const colores = filtrosActivos.Colores || [];
     const tallas = filtrosActivos.Tallas || [];
     const orden = filtrosActivos['Ordenar Por']?.[0];
@@ -99,6 +169,12 @@ const categoriasDisponibles =
       String(b ?? '').trim().toLowerCase();
 
     let resultado = productos.filter((producto) => {
+
+      // Filtrar por género (solo en Ofertas y Winter Season)
+      if (generos.length > 0) {
+        const genero = idsMujer.has(String(producto.id)) ? 'Mujer' : 'Hombre';
+        if (!generos.includes(genero)) return false;
+      }
 
       // Filtrar por categoría
       if (categorias.length > 0) {
@@ -193,7 +269,7 @@ if (orden === 'Más nuevo') {
 
 
     return resultado;
-  }, [productos,filtrosActivos, categoriaPorProducto, fechaPorProducto,]);
+  }, [productos, filtrosActivos, categoriaPorProducto, fechaPorProducto, idsMujer]);
 
   // Avisa al padre cuando se entra o se sale de una categoría (para ocultar su encabezado)
   useEffect(() => {
@@ -255,6 +331,7 @@ useEffect(() => {
   // Lista vertical de categorías como en Figma
   <ScrollView
     style={styles.listaCategorias}
+    contentContainerStyle={{ paddingBottom: paddingInferior }}
     showsVerticalScrollIndicator={false}
   >
     <Pressable
@@ -265,6 +342,26 @@ useEffect(() => {
       }}
     >
       <Text style={styles.textoCategoria}>VER TODO</Text>
+    </Pressable>
+
+    <Pressable
+      style={styles.opcionCategoria}
+      onPress={() => {
+        setCategoriaSeleccionada(OFERTAS);
+        setFiltrosActivos({});
+      }}
+    >
+      <Text style={styles.textoCategoria}>OFERTAS</Text>
+    </Pressable>
+
+    <Pressable
+      style={styles.opcionCategoria}
+      onPress={() => {
+        setCategoriaSeleccionada(WINTER);
+        setFiltrosActivos({});
+      }}
+    >
+      <Text style={styles.textoCategoria}>WINTER SEASON</Text>
     </Pressable>
 
     {categoriasDisponibles.map((categoria) => (
@@ -303,11 +400,15 @@ useEffect(() => {
       </Pressable>
 
       <Text style={styles.tituloCategoria} numberOfLines={1}>
-        {filtrosActivos.Categorias?.length === 1
-          ? filtrosActivos.Categorias[0].toUpperCase()
-          : categoriaSeleccionada === VER_TODO
-            ? generoActivo.toUpperCase()
-            : 'PRODUCTOS'}
+        {categoriaSeleccionada === OFERTAS
+          ? 'OFERTAS'
+          : categoriaSeleccionada === WINTER
+            ? 'WINTER SEASON'
+            : filtrosActivos.Categorias?.length === 1
+              ? filtrosActivos.Categorias[0].toUpperCase()
+              : categoriaSeleccionada === VER_TODO
+                ? generoActivo.toUpperCase()
+                : 'PRODUCTOS'}
       </Text>
 
       <View style={styles.botonRegresar} />
@@ -315,6 +416,9 @@ useEffect(() => {
 
     <FiltroMenu
       categoriasDisponibles={categoriasDisponibles}
+      generosDisponibles={generosDisponibles}
+      coloresDisponibles={coloresDisponibles}
+      tallasDisponibles={tallasDisponibles}
       filtrosActivos={filtrosActivos}
       cantidadResultados={productosFiltrados.length}
       onAplicarFiltros={setFiltrosActivos}
@@ -322,6 +426,12 @@ useEffect(() => {
 
     <ListadoPrendas
       productos={productosFiltrados}
+      paddingInferior={paddingInferior}
+      mensajeVacio={
+        esColeccion
+          ? 'No hay prendas con estos filtros. Prueba quitando el filtro de género para ver las demás.'
+          : 'No hay prendas para mostrar.'
+      }
       onSeleccionarProducto={onSeleccionarProducto}
       esFavorito={esFavorito}
       onToggleFavorito={onToggleFavorito}
