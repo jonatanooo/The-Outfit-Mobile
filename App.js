@@ -26,6 +26,7 @@ import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
 import { buscarPerfil, cerrarSesion } from './src/lib/authService';
+import { agregarFavorito, escucharFavoritos, quitarFavorito } from './src/lib/favoritos';
 import AuthModal from './src/components/AuthScreens';
 import CatalogoCategorias from './src/components/catalogo/CatalogoCategorias';
 import ProfileModal from './src/components/ProfileScreen';
@@ -103,8 +104,18 @@ function MainHomeScreen() {
     setProductoParaTallas(null);
   };
 
-  // Sistema Global de Favoritos (preparado para vinculación futura a Firebase Auth / Firestore)
-  const [favoritos, setFavoritos] = useState([]);
+  // Sistema Global de Favoritos (sincronizado con Firestore cuando hay sesión; ver más abajo)
+  // Sin sesión: lista en memoria. Con sesión: ids guardados en Firestore (colección `Favoritos`),
+  // que se escuchan en tiempo real. `favoritos` se calcula a partir de lo que corresponda.
+  const [favoritosLocales, setFavoritosLocales] = useState([]);
+  const [favoritosRemotos, setFavoritosRemotos] = useState(null); // Set de id de prenda, o null sin sesión
+  const favoritos = useMemo(
+    () =>
+      favoritosRemotos === null
+        ? favoritosLocales
+        : [...productosMujer, ...productosHombre].filter((p) => favoritosRemotos.has(String(p.id))),
+    [favoritosRemotos, favoritosLocales, productosMujer, productosHombre]
+  );
   const [favoritosVisible, setFavoritosVisible] = useState(false);
   const [filtroFavoritos, setFiltroFavoritos] = useState('TODOS'); // 'TODOS' | 'MUJER' | 'HOMBRE'
   const [mostrarFiltroOpciones, setMostrarFiltroOpciones] = useState(false);
@@ -129,10 +140,44 @@ function MainHomeScreen() {
         buscarPerfil(u).then(setPerfilUsuario).catch(() => {});
       } else {
         setPerfilUsuario(null);
+        // Los favoritos de la cuenta no deben quedar a la vista tras cerrar sesión.
+        setFavoritosRemotos(null);
+        setFavoritosLocales([]);
       }
     });
     return cancelar;
   }, []);
+
+  // ---- Favoritos sincronizados con la web (colección `Favoritos`) ----
+  // Con sesión iniciada se escuchan en tiempo real: lo que se marque en la web aparece aquí
+  // y al revés. Sin sesión se quedan en memoria.
+  const favoritosLocalesRef = useRef([]);
+  const idUserFavoritos = perfilUsuario?.ID_User ?? null;
+
+  useEffect(() => {
+    favoritosLocalesRef.current = favoritosLocales;
+  }, [favoritosLocales]);
+
+  useEffect(() => {
+    if (idUserFavoritos == null) return undefined;
+    const perfilFav = { ID_User: idUserFavoritos };
+    let activo = true;
+    let dejarDeEscuchar = () => {};
+    (async () => {
+      // Sube a la cuenta los favoritos que se marcaron antes de iniciar sesión.
+      await Promise.all(
+        favoritosLocalesRef.current.map((p) => agregarFavorito(perfilFav, p.id).catch(() => {}))
+      );
+      if (!activo) return;
+      dejarDeEscuchar = escucharFavoritos(perfilFav, setFavoritosRemotos, (error) =>
+        console.warn('No se pudieron leer los favoritos de Firestore:', error?.code || error)
+      );
+    })();
+    return () => {
+      activo = false;
+      dejarDeEscuchar();
+    };
+  }, [idUserFavoritos]);
 
   // Perfil: si no hay sesión abre el login; si la hay abre la pantalla de perfil
   const abrirPerfil = () => {
@@ -304,37 +349,41 @@ function MainHomeScreen() {
   };
 
   // Función toggle centralizada para agregar/eliminar prendas de favoritos
-  const toggleFavorito = async (producto, userId = null) => {
+  const toggleFavorito = async (producto) => {
     if (!producto || !producto.id) return;
-    const existe = favoritos.some((p) => String(p.id) === String(producto.id));
+    const idTexto = String(producto.id);
+    const existe = favoritos.some((p) => String(p.id) === idTexto);
+    const conSesion = idUserFavoritos != null;
 
-    setFavoritos((prev) => {
-      if (existe) {
-        return prev.filter((p) => String(p.id) !== String(producto.id));
+    // Cambio inmediato en pantalla: en Firestore (con sesión) o en memoria (sin sesión).
+    const aplicar = (agregar) => {
+      if (conSesion) {
+        setFavoritosRemotos((prev) => {
+          const siguiente = new Set(prev || []);
+          if (agregar) siguiente.add(idTexto);
+          else siguiente.delete(idTexto);
+          return siguiente;
+        });
       } else {
-        return [...prev, producto];
+        setFavoritosLocales((prev) =>
+          agregar ? [...prev, producto] : prev.filter((p) => String(p.id) !== idTexto)
+        );
       }
-    });
+    };
+    aplicar(!existe);
 
-    // TODO: Preparación para vincular a Firestore con Firebase Auth:
-    /*
-    try {
-      if (userId) {
-        const favRef = doc(db, 'Favoritos', `${userId}_${producto.id}`);
-        if (existe) {
-          await deleteDoc(favRef);
-        } else {
-          await setDoc(favRef, {
-            userId,
-            productoId: producto.id,
-            fechaAgregado: new Date(),
-          });
-        }
+    // Con sesión, se guarda también en Firestore (la web lo ve al momento).
+    if (conSesion) {
+      const perfilFav = { ID_User: idUserFavoritos };
+      try {
+        if (existe) await quitarFavorito(perfilFav, producto.id);
+        else await agregarFavorito(perfilFav, producto.id);
+      } catch (err) {
+        console.warn('No se pudo guardar el favorito en Firestore:', err?.code || err);
+        aplicar(existe); // se deshace para no mostrar algo que no quedó guardado
+        Alert.alert('Favoritos', 'No se pudo guardar el favorito. Revisa tu conexión e inténtalo de nuevo.');
       }
-    } catch (err) {
-      console.warn('Error al sincronizar favorito con Firebase:', err);
     }
-    */
   };
 
   const abrirFavoritos = () => {
