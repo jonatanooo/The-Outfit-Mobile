@@ -11,6 +11,9 @@ import {
 
 export default function FiltroMenu({
   categoriasDisponibles = [],
+  generosDisponibles = [], // solo en Ofertas y Winter Season (mezclan hombre y mujer)
+  coloresDisponibles = [], // colores que existen en las prendas que se están viendo
+  tallasDisponibles = [], // tallas que existen en las prendas que se están viendo
   filtrosActivos = {},
   cantidadResultados = 0,
   onAplicarFiltros,
@@ -19,7 +22,13 @@ export default function FiltroMenu({
   const [filtrosSeleccionados, setFiltrosSeleccionados] =
     useState({});
 
+  // Las secciones sin opciones no se muestran.
   const secciones = [
+    {
+      titulo: 'Género',
+      tipo: 'multiple',
+      opciones: generosDisponibles,
+    },
     {
       titulo: 'Categorias',
       tipo: 'multiple',
@@ -28,12 +37,12 @@ export default function FiltroMenu({
     {
       titulo: 'Colores',
       tipo: 'multiple',
-      opciones: ['Negro', 'Blanco', 'Verde', 'Azul'],
+      opciones: coloresDisponibles,
     },
     {
       titulo: 'Tallas',
       tipo: 'multiple',
-      opciones: ['S', 'M', 'L', 'XL', 'XXL'],
+      opciones: tallasDisponibles,
     },
     {
       titulo: 'Ordenar Por',
@@ -44,7 +53,7 @@ export default function FiltroMenu({
         'Más nuevo',
       ],
     },
-  ];
+  ].filter((seccion) => seccion.opciones.length > 0);
 
   const abrirFiltros = () => {
     setFiltrosSeleccionados({ ...filtrosActivos });

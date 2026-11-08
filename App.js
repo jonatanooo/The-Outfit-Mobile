@@ -360,10 +360,13 @@ function MainHomeScreen() {
   const [generoMenuTab, setGeneroMenuTab] = useState('mujer'); // 'mujer' | 'hombre'
   const [enCategoriaMenu, setEnCategoriaMenu] = useState(false); // true cuando se ve el listado de una categoría
   const [menuVerTodo, setMenuVerTodo] = useState(false); // true cuando el menú se abre directo en "Ver todo"
+  const [menuColeccion, setMenuColeccion] = useState(null); // abre el menú directo en Ofertas o Winter Season
 
   // Función para abrir la vista del Menú
-  const abrirMenu = (verTodo = false) => {
+  const abrirMenu = (verTodo = false, coleccion = null) => {
     setMenuVerTodo(verTodo === true);
+    // coleccion: { coleccion: 'ofertas' | 'invierno', genero: 'mujer' | 'hombre' | null }
+    setMenuColeccion(coleccion && coleccion.coleccion ? coleccion : null);
     setActiveTab('menu');
     setMenuVisible(true);
   };
@@ -948,7 +951,15 @@ function MainHomeScreen() {
           </View>
 
           {/* Banner Inferior de ancho completo */}
-          <View style={styles.bottomBannerContainer}>
+          {/* La foto es de un hombre: lleva a las ofertas con el filtro de Hombre activo */}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.bottomBannerContainer}
+            onPress={() => {
+              setGeneroMenuTab('hombre');
+              abrirMenu(false, { coleccion: 'ofertas', genero: 'hombre' });
+            }}
+          >
             <Image
               source={require('./assets/imagen.jpg')}
               style={styles.bottomBannerImage}
@@ -958,7 +969,7 @@ function MainHomeScreen() {
             <View style={styles.bottomBannerOverlayBox}>
               <Text style={styles.bottomBannerOverlayText}>SEASON SALE</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Footer simple: 'EL SALVADOR | ESPAÑOL' */}
           <View style={styles.footerContainer}>
@@ -1486,6 +1497,7 @@ function MainHomeScreen() {
       mostrarSelectorGenero={false}
       onCategoriaAbierta={setEnCategoriaMenu}
       iniciarEnVerTodo={menuVerTodo}
+      iniciarEnColeccion={menuColeccion}
       esFavorito={esFavorito}
       onToggleFavorito={toggleFavorito}
       onSeleccionarProducto={(producto) => {

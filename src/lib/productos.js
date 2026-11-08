@@ -4,6 +4,9 @@ import { collection, getDocs } from 'firebase/firestore';
 export const ID_CATEGORIA_MUJER = 56;
 export const ID_CATEGORIA_HOMBRE = 57;
 
+// Colección (campo ID_Temporada del producto) que se muestra como "Winter Season".
+export const ID_TEMPORADA_INVIERNO = 1;
+
 // Precio vigente de una variante (misma regla que usa el catálogo): precio de oferta si aplica.
 export function calcularPrecioVariante(v) {
   const precioActual = Number(v.Precio_Actual) || 0;
@@ -197,6 +200,7 @@ export async function obtenerNuevosIngresosPorGenero() {
         tallas: tallas,
         variantes: variantesPorProducto[pid] || [],
         idGenero: idPadre,
+        idTemporada: p.ID_Temporada != null ? Number(p.ID_Temporada) : null,
         referencia: p.Referencia || String(pid).padStart(9, '7'),
       };
 
