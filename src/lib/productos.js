@@ -7,14 +7,27 @@ export const ID_CATEGORIA_HOMBRE = 57;
 // Colección (campo ID_Temporada del producto) que se muestra como "Winter Season".
 export const ID_TEMPORADA_INVIERNO = 1;
 
-// Precio vigente de una variante (misma regla que usa el catálogo): precio de oferta si aplica.
-export function calcularPrecioVariante(v) {
+// Una oferta solo vale entre Fecha_Inicio_Oferta y Fecha_Fin_Oferta (como en la web).
+// Si falta una de las fechas, ese extremo no se comprueba.
+export function ofertaVigente(inicio, fin, ahora = new Date()) {
+  const desde = inicio ? new Date(inicio).getTime() : NaN;
+  const hasta = fin ? new Date(fin).getTime() : NaN;
+  const t = ahora.getTime();
+  if (Number.isFinite(desde) && t < desde) return false;
+  if (Number.isFinite(hasta) && t > hasta) return false;
+  return true;
+}
+
+// Precio vigente de una variante (misma regla que usa el catálogo): precio de oferta si aplica
+// y si la oferta no ha vencido.
+export function calcularPrecioVariante(v, ahora = new Date()) {
   const precioActual = Number(v.Precio_Actual) || 0;
   const precioOferta = v.Precio_Oferta != null ? Number(v.Precio_Oferta) : null;
   const enOferta = Boolean(
     (v.Tiene_Descuento || (precioOferta && precioOferta < precioActual)) &&
       precioOferta != null &&
-      precioOferta < precioActual
+      precioOferta < precioActual &&
+      ofertaVigente(v.Fecha_Inicio_Oferta, v.Fecha_Fin_Oferta, ahora)
   );
   const porcentaje = Number(v.Porcentaje_Descuento) ||
     (enOferta && precioActual > 0 ? Math.round((1 - precioOferta / precioActual) * 100) : 0);
@@ -136,14 +149,18 @@ export async function obtenerNuevosIngresosPorGenero() {
       // Precios y ofertas
       const precioActual = Number(v.Precio_Actual);
       const precioOferta = v.Precio_Oferta != null ? Number(v.Precio_Oferta) : null;
-      const tieneDesc = Boolean(v.Tiene_Descuento || (precioOferta && precioOferta < precioActual));
+      // La oferta de la variante solo cuenta si no ha vencido.
+      const tieneDesc =
+        Boolean(v.Tiene_Descuento || (precioOferta && precioOferta < precioActual)) &&
+        ofertaVigente(v.Fecha_Inicio_Oferta, v.Fecha_Fin_Oferta);
+      const precioEfectivo = tieneDesc && precioOferta ? precioOferta : (precioActual || 30.99);
 
-      if (!preciosPorProducto[pid] || (precioOferta || precioActual) < preciosPorProducto[pid].precioFinal) {
+      if (!preciosPorProducto[pid] || precioEfectivo < preciosPorProducto[pid].precioFinal) {
         preciosPorProducto[pid] = {
           precioOriginal: precioActual || 30.99,
-          precioFinal: tieneDesc && precioOferta ? precioOferta : (precioActual || 30.99),
+          precioFinal: precioEfectivo,
           enOferta: tieneDesc,
-          porcentajeDescuento: Number(v.Porcentaje_Descuento || 0),
+          porcentajeDescuento: tieneDesc ? Number(v.Porcentaje_Descuento || 0) : 0,
         };
       }
     });
@@ -169,15 +186,20 @@ export async function obtenerNuevosIngresosPorGenero() {
       const imagenPrincipal = fotosUrls[0] || null;
 
       // Cálculo de precio y descuento
+      const ofertaProducto =
+        Boolean(p.Tiene_Descuento) && ofertaVigente(p.Fecha_Inicio_Oferta, p.Fecha_Fin_Oferta);
       const precioInfo = preciosPorProducto[pid] || {
         precioOriginal: Number(p.Precio ?? p.precio) || 30.99,
         precioFinal: Number(p.Precio ?? p.precio) || 30.99,
-        enOferta: Boolean(p.Tiene_Descuento),
-        porcentajeDescuento: Number(p.Porcentaje_Descuento || 0),
+        enOferta: ofertaProducto,
+        porcentajeDescuento: ofertaProducto ? Number(p.Porcentaje_Descuento || 0) : 0,
       };
 
-      const tieneOferta = Boolean(p.Tiene_Descuento || precioInfo.enOferta);
-      const pctDesc = Number(p.Porcentaje_Descuento || precioInfo.porcentajeDescuento || (tieneOferta ? 20 : 0));
+      // Con variantes, mandan ellas (es lo que se cobra); sin variantes, la oferta del producto.
+      const tieneOferta = preciosPorProducto[pid] ? precioInfo.enOferta : ofertaProducto;
+      const pctDesc = tieneOferta
+        ? Number(p.Porcentaje_Descuento || precioInfo.porcentajeDescuento || 20)
+        : 0;
       const precioOriginal = precioInfo.precioOriginal || Number(p.Precio ?? p.precio) || 30.99;
       let precioFinal = tieneOferta
         ? (precioInfo.precioFinal < precioOriginal ? precioInfo.precioFinal : +(precioOriginal * (1 - pctDesc / 100)).toFixed(2))
