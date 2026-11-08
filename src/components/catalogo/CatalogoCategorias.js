@@ -54,7 +54,7 @@ export default function CatalogoCategorias({
   const paddingInferior = Math.max(insets.bottom, 12) + 75;
 
   const [filtrosActivos, setFiltrosActivos] = useState(
-    iniciarEnColeccion?.genero
+    iniciarEnColeccion?.coleccion === 'ofertas' && iniciarEnColeccion?.genero
       ? { 'Género': [iniciarEnColeccion.genero === 'hombre' ? 'Hombre' : 'Mujer'] }
       : {}
   );
@@ -98,28 +98,29 @@ useEffect(() => {
   };
 }, []);
 
-  const esColeccion =
-    categoriaSeleccionada === OFERTAS || categoriaSeleccionada === WINTER;
+  const esOfertas = categoriaSeleccionada === OFERTAS;
 
-  // Ofertas y Winter Season mezclan hombre y mujer; el resto usa el género activo.
+  // Ofertas mezcla hombre y mujer (con filtro de Género). Winter Season y el resto
+  // usan solo las prendas del género activo.
   const productos = useMemo(() => {
-    if (categoriaSeleccionada === OFERTAS) {
+    if (esOfertas) {
       return [...productosMujer, ...productosHombre].filter((p) => p.enOferta);
     }
+    const delGenero = generoActivo === 'mujer' ? productosMujer : productosHombre;
     if (categoriaSeleccionada === WINTER) {
-      return [...productosMujer, ...productosHombre].filter(
+      return delGenero.filter(
         (p) => Number(p.idTemporada) === ID_TEMPORADA_INVIERNO
       );
     }
-    return generoActivo === 'mujer' ? productosMujer : productosHombre;
-  }, [categoriaSeleccionada, generoActivo, productosMujer, productosHombre]);
+    return delGenero;
+  }, [esOfertas, categoriaSeleccionada, generoActivo, productosMujer, productosHombre]);
 
   const idsMujer = useMemo(
     () => new Set(productosMujer.map((p) => String(p.id))),
     [productosMujer]
   );
 
-  const categoriasDisponibles = esColeccion
+  const categoriasDisponibles = esOfertas
     ? unicos([
         ...(categoriasPorGenero.mujer || []),
         ...(categoriasPorGenero.hombre || []),
@@ -164,7 +165,7 @@ useEffect(() => {
     [productos]
   );
 
-  const generosDisponibles = esColeccion ? ['Mujer', 'Hombre'] : [];
+  const generosDisponibles = esOfertas ? ['Mujer', 'Hombre'] : [];
 
 
   // Aplicar filtros a las prendas existentes
@@ -359,7 +360,8 @@ useEffect(() => {
       style={styles.opcionCategoria}
       onPress={() => {
         setCategoriaSeleccionada(OFERTAS);
-        setFiltrosActivos({});
+        // Entra con el género de la pestaña ya marcado; se puede cambiar en el filtro.
+        setFiltrosActivos({ 'Género': [generoActivo === 'hombre' ? 'Hombre' : 'Mujer'] });
       }}
     >
       <Text style={styles.textoCategoria}>OFERTAS</Text>
@@ -440,9 +442,11 @@ useEffect(() => {
       productos={productosFiltrados}
       paddingInferior={paddingInferior}
       mensajeVacio={
-        esColeccion
-          ? 'No hay prendas con estos filtros. Prueba quitando el filtro de género para ver las demás.'
-          : 'No hay prendas para mostrar.'
+        esOfertas
+          ? 'No hay ofertas con estos filtros. Prueba quitando el filtro de género para ver las demás.'
+          : categoriaSeleccionada === WINTER
+            ? 'No hay prendas de Winter Season en esta sección.'
+            : 'No hay prendas para mostrar.'
       }
       onSeleccionarProducto={onSeleccionarProducto}
       esFavorito={esFavorito}
