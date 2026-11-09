@@ -28,6 +28,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
 import { buscarPerfil, cerrarSesion } from './src/lib/authService';
 import { agregarFavorito, escucharFavoritos, quitarFavorito } from './src/lib/favoritos';
+import { escucharCarrito, fijarCantidadRemota, vaciarCarritoRemoto } from './src/lib/carritoRemoto';
 import AuthModal from './src/components/AuthScreens';
 import CatalogoCategorias from './src/components/catalogo/CatalogoCategorias';
 import ProfileModal from './src/components/ProfileScreen';
@@ -110,6 +111,9 @@ function MainHomeScreen() {
   // que se escuchan en tiempo real. `favoritos` se calcula a partir de lo que corresponda.
   const [favoritosLocales, setFavoritosLocales] = useState([]);
   const [favoritosRemotos, setFavoritosRemotos] = useState(null); // Set de id de prenda, o null sin sesión
+  const [lineasCesta, setLineasCesta] = useState(null); // líneas de la cesta en Firestore, o null sin sesión
+  const huboSesionCesta = useRef(false);
+  const reemplazarItemsCesta = useRef(null);
   const favoritos = useMemo(
     () =>
       favoritosRemotos === null
@@ -144,6 +148,12 @@ function MainHomeScreen() {
         // Los favoritos de la cuenta no deben quedar a la vista tras cerrar sesión.
         setFavoritosRemotos(null);
         setFavoritosLocales([]);
+        // Lo mismo con la cesta: la de la cuenta no debe quedar en el teléfono.
+        setLineasCesta(null);
+        if (huboSesionCesta.current) {
+          huboSesionCesta.current = false;
+          reemplazarItemsCesta.current?.([]);
+        }
       }
     });
     return cancelar;
@@ -179,6 +189,67 @@ function MainHomeScreen() {
       dejarDeEscuchar();
     };
   }, [idUserFavoritos]);
+
+  // ---- Cesta compartida con la web (colecciones `Carrito` y `Carrito_Detalle`) ----
+  // Con sesión iniciada, la cesta vive en Firestore y se actualiza en tiempo real: lo que se agregue
+  // en la web aparece aquí y al revés. Sin sesión se queda en el teléfono.
+  const registrarSincronizadorCesta = carrito.registrarSincronizador;
+  const reemplazarItemsDeCesta = carrito.reemplazarItems;
+  const escriturasCesta = useRef(0);
+  const cestaLocalRef = useRef([]);
+
+  useEffect(() => {
+    cestaLocalRef.current = carrito.items;
+    reemplazarItemsCesta.current = reemplazarItemsDeCesta;
+  }, [carrito.items, reemplazarItemsDeCesta]);
+
+  useEffect(() => {
+    if (idUserFavoritos == null) {
+      registrarSincronizadorCesta(null);
+      return undefined;
+    }
+    huboSesionCesta.current = true;
+    const perfilCesta = { ID_User: idUserFavoritos };
+
+    // Cada cambio de la cesta se escribe en Firestore.
+    registrarSincronizadorCesta(async (cambio) => {
+      escriturasCesta.current += 1;
+      try {
+        if (cambio.tipo === 'vaciar') await vaciarCarritoRemoto(perfilCesta);
+        else await fijarCantidadRemota(perfilCesta, cambio.idVariante, cambio.cantidad);
+      } catch (err) {
+        console.warn('No se pudo guardar la cesta en Firestore:', err?.code || err);
+      } finally {
+        escriturasCesta.current -= 1;
+      }
+    });
+
+    let primera = true;
+    const dejarDeEscuchar = escucharCarrito(
+      perfilCesta,
+      (lineas) => {
+        let todas = lineas;
+        if (primera) {
+          primera = false;
+          // Sube a la cuenta lo que se agregó a la cesta antes de iniciar sesión.
+          const remotas = new Set(lineas.map((l) => String(l.idVariante)));
+          const nuevas = cestaLocalRef.current.filter((i) => !remotas.has(String(i.idVariante)));
+          nuevas.forEach((i) =>
+            fijarCantidadRemota(perfilCesta, i.idVariante, i.cantidad).catch(() => {})
+          );
+          todas = [...lineas, ...nuevas.map((i) => ({ idVariante: i.idVariante, cantidad: i.cantidad }))];
+        }
+        // Mientras se escribe un cambio propio no se pisa la pantalla con datos anteriores.
+        if (escriturasCesta.current > 0) return;
+        setLineasCesta(todas);
+      },
+      (error) => console.warn('No se pudo leer la cesta de Firestore:', error?.code || error)
+    );
+    return () => {
+      dejarDeEscuchar();
+      registrarSincronizadorCesta(null);
+    };
+  }, [idUserFavoritos, registrarSincronizadorCesta]);
 
   // Perfil: si no hay sesión abre el login; si la hay abre la pantalla de perfil
   const abrirPerfil = () => {
@@ -516,6 +587,38 @@ function MainHomeScreen() {
     };
   }, []);
 
+  // Convierte las líneas de la cesta de Firestore en artículos, con los datos actuales del catálogo.
+  useEffect(() => {
+    if (lineasCesta === null) return;
+    const catalogo = [...productosMujer, ...productosHombre];
+    if (catalogo.length === 0) return; // se espera a que cargue el catálogo
+    const porVariante = new Map();
+    catalogo.forEach((p) => (p.variantes || []).forEach((v) => porVariante.set(String(v.id), { p, v })));
+    const items = lineasCesta.flatMap((linea) => {
+      const encontrado = porVariante.get(String(linea.idVariante));
+      if (!encontrado || !(encontrado.v.stock > 0)) return []; // prenda que ya no existe o sin stock
+      const { p, v } = encontrado;
+      return [
+        {
+          idVariante: v.id,
+          idProducto: p.id,
+          idGenero: p.idGenero,
+          nombre: p.nombre,
+          imagen: p.imagen,
+          talla: v.talla,
+          color: v.color || '',
+          precio: v.precio,
+          precioOriginal: v.precioOriginal,
+          enOferta: v.enOferta,
+          porcentajeDescuento: v.porcentajeDescuento,
+          stockDisponible: v.stock,
+          cantidad: Math.min(linea.cantidad, v.stock),
+        },
+      ];
+    });
+    reemplazarItemsDeCesta(items);
+  }, [lineasCesta, productosMujer, productosHombre, reemplazarItemsDeCesta]);
+
   // La cesta guarda los precios del momento en que se agregó cada prenda. Cuando el catálogo
   // se carga (o la cesta termina de cargar), se actualizan con los precios y ofertas vigentes.
   const actualizarPreciosCesta = carrito.actualizarPrecios;
@@ -531,7 +634,8 @@ function MainHomeScreen() {
         stock: v.stock,
       }))
     );
-    actualizarPreciosCesta(vigentes);
+    // El catálogo completo: además de los precios, se quitan las prendas que ya no existen.
+    actualizarPreciosCesta(vigentes, { quitarAusentes: true });
   }, [productosMujer, productosHombre, carrito.cargado, actualizarPreciosCesta]);
 
   const handleScrollHero = (event) => {
