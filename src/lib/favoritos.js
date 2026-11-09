@@ -1,16 +1,15 @@
 // Favoritos sincronizados con la web: colección `Favoritos` de Firestore, un documento por
 // prenda marcada, con los campos ID_User (número del usuario) e ID_Producto (número de la prenda).
-// La web los lee por esos dos campos, así que aquí también se busca por ellos y no por el id del
-// documento (que puede ser distinto según quién lo creó).
+// Mismo formato que la web: id de documento automático y los campos ID_User, ID_Producto y
+// Fecha_Agregado. Se busca siempre por ID_User e ID_Producto y no por el id del documento.
 
 import {
+  addDoc,
   collection,
   deleteDoc,
-  doc,
   getDocs,
   onSnapshot,
   query,
-  setDoc,
   where,
 } from 'firebase/firestore';
 import { db } from './firebaseClient';
@@ -74,10 +73,11 @@ export async function agregarFavorito(perfil, idProducto) {
   if (idUser == null || !Number.isFinite(idProd)) return;
   const existentes = await documentosDe(perfil, idProd);
   if (existentes.length > 0) return;
-  await setDoc(doc(db, COLECCION, `${idUser}_${idProd}`), {
+  // Igual que la web: documento con id automático y los campos ID_User, ID_Producto y Fecha_Agregado.
+  await addDoc(collection(db, COLECCION), {
     ID_User: idUser,
     ID_Producto: idProd,
-    Fecha_Creacion: new Date().toISOString(),
+    Fecha_Agregado: new Date().toISOString(),
   });
 }
 
