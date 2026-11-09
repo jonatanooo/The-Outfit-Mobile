@@ -1,12 +1,10 @@
 import { db } from './firebaseClient';
 import { collection, getDocs } from 'firebase/firestore';
 import { calcularPrecioConDescuento, esOfertaActiva, precioDeVariante } from './descuentos';
+import { esWinterSeason } from './temporadas';
 
 export const ID_CATEGORIA_MUJER = 56;
 export const ID_CATEGORIA_HOMBRE = 57;
-
-// Colección (campo ID_Temporada del producto) que se muestra como "Winter Season".
-export const ID_TEMPORADA_INVIERNO = 1;
 
 // Precio vigente de una variante: misma regla que la web (ver descuentos.js). `producto` son los
 // datos del documento Productos, porque la oferta puede estar en la variante o en el producto.
@@ -20,7 +18,7 @@ export function calcularPrecioVariante(v, producto = null, ahora = Date.now()) {
  */
 export async function obtenerNuevosIngresosPorGenero() {
   try {
-    const [catSnap, prodSnap, fotosSnap, varSnap, tallaSnap, tiposTallaSnap, invSnap, colorSnap] = await Promise.all([
+    const [catSnap, prodSnap, fotosSnap, varSnap, tallaSnap, tiposTallaSnap, invSnap, colorSnap, tempSnap] = await Promise.all([
       getDocs(collection(db, 'Categorias_Producto')),
       getDocs(collection(db, 'Productos')),
       getDocs(collection(db, 'Fotos_Productos')),
@@ -29,6 +27,8 @@ export async function obtenerNuevosIngresosPorGenero() {
       getDocs(collection(db, 'Tipos_Talla')),
       getDocs(collection(db, 'Inventario')),
       getDocs(collection(db, 'Colores')),
+      // Como la web: si no se puede leer (sin sesión), se sigue sin los nombres de temporada.
+      getDocs(collection(db, 'Temporadas')).catch(() => ({ docs: [] })),
     ]);
 
     // Stock por variante y nombre de color (para poder añadir una variante concreta al carrito)
@@ -48,11 +48,22 @@ export async function obtenerNuevosIngresosPorGenero() {
       }
     });
 
+    // Temporadas por id (para reconocer Winter Season por su nombre, como la web)
+    const temporadasPorId = {};
+    tempSnap.docs.forEach((d) => {
+      const data = d.data();
+      const id = data.ID_Temporada ?? d.id;
+      temporadasPorId[id] = data;
+      temporadasPorId[String(id)] = data;
+    });
+
     // 1. Mapear CategoriaPadre por ID_Categoria
     const catPadreMap = {};
+    const catPorId = {};
     catSnap.docs.forEach((d) => {
       const data = d.data();
       const id = data.ID_categoria ?? d.id;
+      catPorId[String(id)] = data;
       const padre = data.ID_CategoriaPadre || id;
       catPadreMap[id] = padre;
       catPadreMap[String(id)] = padre;
@@ -188,6 +199,7 @@ export async function obtenerNuevosIngresosPorGenero() {
         variantes: variantesPorProducto[pid] || [],
         idGenero: idPadre,
         idTemporada: p.ID_Temporada != null ? Number(p.ID_Temporada) : null,
+        esWinterSeason: esWinterSeason(p, catPorId[String(catId)], temporadasPorId),
         referencia: p.Referencia || String(pid).padStart(9, '7'),
       };
 

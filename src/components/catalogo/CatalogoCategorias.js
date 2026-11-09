@@ -19,7 +19,6 @@ import FiltroMenu from './FiltroMenu';
 import ListadoPrendas from './ListadoPrendas';
 
 import { cargarCategoriasCatalogo } from './cargarCategoriasCatalogo';
-import { ID_TEMPORADA_INVIERNO } from '../../lib/productos';
 
 
 
@@ -108,9 +107,7 @@ useEffect(() => {
     }
     const delGenero = generoActivo === 'mujer' ? productosMujer : productosHombre;
     if (categoriaSeleccionada === WINTER) {
-      return delGenero.filter(
-        (p) => Number(p.idTemporada) === ID_TEMPORADA_INVIERNO
-      );
+      return delGenero.filter((p) => p.esWinterSeason);
     }
     return delGenero;
   }, [esOfertas, categoriaSeleccionada, generoActivo, productosMujer, productosHombre]);
