@@ -498,6 +498,24 @@ function MainHomeScreen() {
     };
   }, []);
 
+  // La cesta guarda los precios del momento en que se agregó cada prenda. Cuando el catálogo
+  // se carga (o la cesta termina de cargar), se actualizan con los precios y ofertas vigentes.
+  const actualizarPreciosCesta = carrito.actualizarPrecios;
+  useEffect(() => {
+    if (!carrito.cargado) return;
+    const vigentes = [...productosMujer, ...productosHombre].flatMap((p) =>
+      (p.variantes || []).map((v) => ({
+        idVariante: v.id,
+        precio: v.precio,
+        precioOriginal: v.precioOriginal,
+        enOferta: v.enOferta,
+        porcentajeDescuento: v.porcentajeDescuento,
+        stock: v.stock,
+      }))
+    );
+    actualizarPreciosCesta(vigentes);
+  }, [productosMujer, productosHombre, carrito.cargado, actualizarPreciosCesta]);
+
   const handleScrollHero = (event) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
@@ -1920,6 +1938,7 @@ function MainHomeScreen() {
         onVolverCarrito={volverAlCarrito}
         onNavegar={navegarDesdeCheckout}
         onCompraCompletada={carrito.vaciar}
+        onPreciosActualizados={carrito.actualizarPrecios}
         onFinalizar={terminarCompra}
       />
 

@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, runTransaction, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, runTransaction, setDoc, where } from 'firebase/firestore';
 import { db } from './firebaseClient';
 import { calcularPrecioVariante } from './productos';
 import { TIENDA_DIRECCION, calcularEnvio, redondear } from './tienda';
@@ -9,6 +9,16 @@ export class PedidoError extends Error {
   constructor(message) {
     super(message);
     this.name = 'PedidoError';
+  }
+}
+
+// El precio real de alguna prenda es distinto al que se mostraba en la cesta. No se cobra nada;
+// `precios` trae los precios vigentes para actualizar la cesta.
+export class PrecioCambiadoError extends PedidoError {
+  constructor(message, precios) {
+    super(message);
+    this.name = 'PrecioCambiadoError';
+    this.precios = precios;
   }
 }
 
@@ -105,6 +115,27 @@ export async function crearPedido({ perfil, correo, items, entrega, metodoPago, 
     documentosPorVariante('Inventario', ids),
   ]);
 
+  // Datos del producto de cada variante: la oferta puede estar en la variante o en el producto.
+  const idsProducto = [
+    ...new Set(
+      ids
+        .map((id) => variantes[String(id)]?.[0]?.data().ID_Producto)
+        .filter((id) => id != null)
+        .map(String)
+    ),
+  ];
+  const productos = {};
+  await Promise.all(
+    idsProducto.map(async (idProducto) => {
+      try {
+        const snap = await getDoc(doc(db, 'Productos', idProducto));
+        if (snap.exists()) productos[idProducto] = snap.data();
+      } catch {
+        // Sin los datos del producto solo cuenta la oferta de la variante.
+      }
+    })
+  );
+
   const lineas = items.map((item) => {
     const varDoc = variantes[String(item.idVariante)]?.[0];
     if (!varDoc) throw new PedidoError(`"${item.nombre}" ya no está disponible. Quítalo de tu cesta.`);
@@ -120,8 +151,31 @@ export async function crearPedido({ perfil, correo, items, entrega, metodoPago, 
           : `"${item.nombre}" (talla ${item.talla}) se agotó. Quítalo de tu cesta.`
       );
     }
-    return { item, invRef: invDoc.ref, ...calcularPrecioVariante(varDoc.data()) };
+    const datosVariante = varDoc.data();
+    return {
+      item,
+      invRef: invDoc.ref,
+      ...calcularPrecioVariante(datosVariante, productos[String(datosVariante.ID_Producto)]),
+    };
   });
+
+  // Lo que se cobra tiene que ser lo que la persona vio en su cesta.
+  const cambiadas = lineas.filter((l) => Math.abs(l.precio - Number(l.item.precio)) > 0.005);
+  if (cambiadas.length > 0) {
+    const detalle = cambiadas
+      .map((l) => `"${l.item.nombre}" ahora cuesta $${l.precio.toFixed(2)}`)
+      .join(', ');
+    throw new PrecioCambiadoError(
+      `Los precios de tu cesta cambiaron: ${detalle}. No se realizó ningún cobro. Revisa tu cesta y vuelve a intentarlo.`,
+      lineas.map((l) => ({
+        idVariante: l.item.idVariante,
+        precio: l.precio,
+        precioOriginal: l.precioOriginal,
+        enOferta: l.enOferta,
+        porcentajeDescuento: l.porcentajeDescuento,
+      }))
+    );
+  }
 
   const subtotalOriginal = redondear(lineas.reduce((a, l) => a + l.precioOriginal * l.item.cantidad, 0));
   const subtotal = redondear(lineas.reduce((a, l) => a + l.precio * l.item.cantidad, 0));

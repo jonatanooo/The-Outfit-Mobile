@@ -103,6 +103,41 @@ export function CarritoProvider({ children }) {
 
   const vaciar = useCallback(() => aplicar([]), [aplicar]);
 
+  // Pone al día los artículos de la cesta con los datos vigentes de cada variante:
+  // lista de { idVariante, precio, precioOriginal, enOferta, porcentajeDescuento, stock? }.
+  // Así la cesta nunca muestra el precio de una oferta que ya venció. Solo cambia (y vuelve a
+  // dibujar) si algún dato es distinto.
+  const actualizarPrecios = useCallback(
+    (vigentes) => {
+      if (!Array.isArray(vigentes) || vigentes.length === 0) return;
+      const porVariante = new Map(vigentes.map((v) => [String(v.idVariante), v]));
+      let hayCambios = false;
+      const nuevos = itemsRef.current.map((item) => {
+        const v = porVariante.get(String(item.idVariante));
+        if (!v) return item;
+        const siguiente = {
+          ...item,
+          precio: v.precio,
+          precioOriginal: v.precioOriginal,
+          enOferta: v.enOferta,
+          porcentajeDescuento: v.porcentajeDescuento,
+          stockDisponible: v.stock != null ? v.stock : item.stockDisponible,
+        };
+        const distinto =
+          siguiente.precio !== item.precio ||
+          siguiente.precioOriginal !== item.precioOriginal ||
+          siguiente.enOferta !== item.enOferta ||
+          siguiente.porcentajeDescuento !== item.porcentajeDescuento ||
+          siguiente.stockDisponible !== item.stockDisponible;
+        if (!distinto) return item;
+        hayCambios = true;
+        return siguiente;
+      });
+      if (hayCambios) aplicar(nuevos);
+    },
+    [aplicar]
+  );
+
   const valor = useMemo(() => {
     const subtotal = redondear(items.reduce((acc, i) => acc + i.precio * i.cantidad, 0));
     const subtotalOriginal = redondear(items.reduce((acc, i) => acc + (i.precioOriginal || i.precio) * i.cantidad, 0));
@@ -116,8 +151,9 @@ export function CarritoProvider({ children }) {
       agregar,
       cambiarCantidad,
       vaciar,
+      actualizarPrecios,
     };
-  }, [items, cargado, agregar, cambiarCantidad, vaciar]);
+  }, [items, cargado, agregar, cambiarCantidad, vaciar, actualizarPrecios]);
 
   return <CarritoContext.Provider value={valor}>{children}</CarritoContext.Provider>;
 }

@@ -21,7 +21,7 @@ import PasoPago from './checkout/PasoPago';
 import PasoConfirmacion from './checkout/PasoConfirmacion';
 import { calcularEnvio, redondear } from '../lib/tienda';
 import { METODOS_PAGO, PagoRechazadoError, procesarPagoSimulado } from '../lib/pagoSimulado';
-import { PedidoError, crearDireccion, crearPedido, listarDirecciones } from '../lib/pedidos';
+import { PedidoError, PrecioCambiadoError, crearDireccion, crearPedido, listarDirecciones } from '../lib/pedidos';
 
 const SUBTITULOS = {
   envio: 'MÉTODO DE ENVIO',
@@ -40,6 +40,7 @@ function CheckoutContenido({
   onVolverCarrito,
   onNavegar,
   onCompraCompletada,
+  onPreciosActualizados,
   onFinalizar,
 }) {
   const tecladoVisible = useKeyboardVisible();
@@ -117,6 +118,8 @@ function CheckoutContenido({
       onCompraCompletada();
     } catch (e) {
       if (e instanceof PagoRechazadoError || e instanceof PedidoError) {
+        // Si el precio cambió, la cesta se actualiza con los precios vigentes.
+        if (e instanceof PrecioCambiadoError) onPreciosActualizados?.(e.precios);
         setErrorPago(e.message);
       } else {
         console.warn('Error al registrar la compra:', e?.code || e);

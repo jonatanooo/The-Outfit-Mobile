@@ -1,5 +1,6 @@
 import { db } from './firebaseClient';
 import { collection, getDocs } from 'firebase/firestore';
+import { calcularPrecioConDescuento, esOfertaActiva, precioDeVariante } from './descuentos';
 
 export const ID_CATEGORIA_MUJER = 56;
 export const ID_CATEGORIA_HOMBRE = 57;
@@ -7,36 +8,10 @@ export const ID_CATEGORIA_HOMBRE = 57;
 // Colección (campo ID_Temporada del producto) que se muestra como "Winter Season".
 export const ID_TEMPORADA_INVIERNO = 1;
 
-// Una oferta solo vale entre Fecha_Inicio_Oferta y Fecha_Fin_Oferta (como en la web).
-// Si falta una de las fechas, ese extremo no se comprueba.
-export function ofertaVigente(inicio, fin, ahora = new Date()) {
-  const desde = inicio ? new Date(inicio).getTime() : NaN;
-  const hasta = fin ? new Date(fin).getTime() : NaN;
-  const t = ahora.getTime();
-  if (Number.isFinite(desde) && t < desde) return false;
-  if (Number.isFinite(hasta) && t > hasta) return false;
-  return true;
-}
-
-// Precio vigente de una variante (misma regla que usa el catálogo): precio de oferta si aplica
-// y si la oferta no ha vencido.
-export function calcularPrecioVariante(v, ahora = new Date()) {
-  const precioActual = Number(v.Precio_Actual) || 0;
-  const precioOferta = v.Precio_Oferta != null ? Number(v.Precio_Oferta) : null;
-  const enOferta = Boolean(
-    (v.Tiene_Descuento || (precioOferta && precioOferta < precioActual)) &&
-      precioOferta != null &&
-      precioOferta < precioActual &&
-      ofertaVigente(v.Fecha_Inicio_Oferta, v.Fecha_Fin_Oferta, ahora)
-  );
-  const porcentaje = Number(v.Porcentaje_Descuento) ||
-    (enOferta && precioActual > 0 ? Math.round((1 - precioOferta / precioActual) * 100) : 0);
-  return {
-    precioOriginal: precioActual,
-    precio: enOferta ? precioOferta : precioActual,
-    enOferta,
-    porcentajeDescuento: enOferta ? porcentaje : 0,
-  };
+// Precio vigente de una variante: misma regla que la web (ver descuentos.js). `producto` son los
+// datos del documento Productos, porque la oferta puede estar en la variante o en el producto.
+export function calcularPrecioVariante(v, producto = null, ahora = Date.now()) {
+  return precioDeVariante(v, producto, ahora);
 }
 
 /**
@@ -115,8 +90,13 @@ export async function obtenerNuevosIngresosPorGenero() {
     });
 
     // 5. Indexar Variantes: Tallas disponibles y precios por ID_Producto
+    const productoPorId = {};
+    prodSnap.docs.forEach((d) => {
+      const dato = d.data();
+      productoPorId[String(dato.ID_Producto ?? d.id)] = dato;
+    });
     const tallasPorProducto = {};
-    const preciosPorProducto = {};
+    const variantesRawPorProducto = {};
     const variantesPorProducto = {};
     varSnap.docs.forEach((doc) => {
       const v = doc.data();
@@ -143,26 +123,10 @@ export async function obtenerNuevosIngresosPorGenero() {
         color: v.ID_Color != null ? colorMap[String(v.ID_Color)] || '' : '',
         colorHex: v.ID_Color != null ? colorHexMap[String(v.ID_Color)] || null : null,
         stock: stockPorVariante[String(idVariante)] ?? 0,
-        ...calcularPrecioVariante(v),
+        ...calcularPrecioVariante(v, productoPorId[pid]),
       });
 
-      // Precios y ofertas
-      const precioActual = Number(v.Precio_Actual);
-      const precioOferta = v.Precio_Oferta != null ? Number(v.Precio_Oferta) : null;
-      // La oferta de la variante solo cuenta si no ha vencido.
-      const tieneDesc =
-        Boolean(v.Tiene_Descuento || (precioOferta && precioOferta < precioActual)) &&
-        ofertaVigente(v.Fecha_Inicio_Oferta, v.Fecha_Fin_Oferta);
-      const precioEfectivo = tieneDesc && precioOferta ? precioOferta : (precioActual || 30.99);
-
-      if (!preciosPorProducto[pid] || precioEfectivo < preciosPorProducto[pid].precioFinal) {
-        preciosPorProducto[pid] = {
-          precioOriginal: precioActual || 30.99,
-          precioFinal: precioEfectivo,
-          enOferta: tieneDesc,
-          porcentajeDescuento: tieneDesc ? Number(v.Porcentaje_Descuento || 0) : 0,
-        };
-      }
+      (variantesRawPorProducto[pid] ||= []).push(v);
     });
 
     const mujer = [];
@@ -185,24 +149,20 @@ export async function obtenerNuevosIngresosPorGenero() {
       }
       const imagenPrincipal = fotosUrls[0] || null;
 
-      // Cálculo de precio y descuento
-      const ofertaProducto =
-        Boolean(p.Tiene_Descuento) && ofertaVigente(p.Fecha_Inicio_Oferta, p.Fecha_Fin_Oferta);
-      const precioInfo = preciosPorProducto[pid] || {
-        precioOriginal: Number(p.Precio ?? p.precio) || 30.99,
-        precioFinal: Number(p.Precio ?? p.precio) || 30.99,
-        enOferta: ofertaProducto,
-        porcentajeDescuento: ofertaProducto ? Number(p.Porcentaje_Descuento || 0) : 0,
-      };
-
-      // Con variantes, mandan ellas (es lo que se cobra); sin variantes, la oferta del producto.
-      const tieneOferta = preciosPorProducto[pid] ? precioInfo.enOferta : ofertaProducto;
+      // Precio de la tarjeta (igual que el listado de la web): el precio base más bajo de sus
+      // variantes y, si el producto o alguna variante tiene oferta vigente, con su descuento.
+      const variantesRaw = variantesRawPorProducto[pid] || [];
+      const preciosBase = variantesRaw.map((v) => Number(v.Precio_Actual)).filter((n) => n > 0);
+      const precioOriginal = preciosBase.length
+        ? Math.min(...preciosBase)
+        : Number(p.Precio_Base ?? p.Precio ?? p.precio) || 0;
+      const varianteEnOferta = variantesRaw.find((v) => esOfertaActiva(v));
+      const tieneOferta = esOfertaActiva(p) || Boolean(varianteEnOferta);
       const pctDesc = tieneOferta
-        ? Number(p.Porcentaje_Descuento || precioInfo.porcentajeDescuento || 20)
+        ? Number(p.Porcentaje_Descuento ?? varianteEnOferta?.Porcentaje_Descuento ?? 0)
         : 0;
-      const precioOriginal = precioInfo.precioOriginal || Number(p.Precio ?? p.precio) || 30.99;
-      let precioFinal = tieneOferta
-        ? (precioInfo.precioFinal < precioOriginal ? precioInfo.precioFinal : +(precioOriginal * (1 - pctDesc / 100)).toFixed(2))
+      const precioFinal = tieneOferta
+        ? calcularPrecioConDescuento(precioOriginal, pctDesc)
         : precioOriginal;
 
       // Tallas ordenadas (sin fallbacks ficticios ni tallas únicas)
