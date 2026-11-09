@@ -29,6 +29,11 @@ export async function cargarCategoriasCatalogo() {
       return;
     }
 
+    // "Winter Season" tiene su propia entrada en el menú (igual que en la web).
+    if (nombre.toUpperCase() === 'WINTER SEASON') {
+      return;
+    }
+
     categoriasPorId.set(id, { nombre, padre });
 
     if (padre === '56') nombresMujer.add(nombre);
