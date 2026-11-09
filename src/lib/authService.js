@@ -11,7 +11,7 @@ import {
 } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from './firebaseClient';
-import { normalizarCorreo, normalizarUsername } from './authValidation';
+import { nombreCompleto, normalizarCorreo, normalizarNombre, normalizarUsername } from './authValidation';
 
 const ROL_CLIENTE = 3;
 const ESTADO_ACTIVO = 1;
@@ -122,7 +122,8 @@ export async function registrarConCorreo({ correo, username, password, telefono 
   } catch {
     // No es crítico.
   }
-  const perfil = await crearPerfil(user, { nombres: usuario, username: usuario, telefono: `+503${telefono}` });
+  // El teléfono se guarda como en la web: solo los 8 dígitos (el +503 es un prefijo de pantalla).
+  const perfil = await crearPerfil(user, { nombres: usuario, username: usuario, telefono });
   return { user, perfil };
 }
 
@@ -216,16 +217,27 @@ export async function continuarConGoogle() {
 }
 
 // Actualiza el mismo documento del usuario (no crea otro). Solo escribe lo que cambió:
-// el nombre de usuario (verificando que nadie más lo tenga) y/o el teléfono (8 dígitos).
-export async function actualizarPerfil(user, perfil, { username, telefono }) {
+// el nombre (campo `Nombres`, como la web), el nombre de usuario (verificando que nadie más lo
+// tenga) y/o el teléfono (8 dígitos, como lo guarda la web).
+export async function actualizarPerfil(user, perfil, { nombre, username, telefono }) {
+  const nuevoNombre = normalizarNombre(nombre);
   const nuevoUsername = normalizarUsername(username);
-  const nuevoTelefono = `+503${telefono}`;
+  const nuevoTelefono = telefono; // solo los 8 dígitos
   if (!perfil) {
-    return crearPerfil(user, { nombres: nuevoUsername, username: nuevoUsername, telefono: nuevoTelefono });
+    return crearPerfil(user, {
+      nombres: nuevoNombre || nuevoUsername,
+      username: nuevoUsername,
+      telefono: nuevoTelefono,
+    });
   }
 
   const docId = perfil._docId || user.uid;
   const cambios = {};
+
+  if (nuevoNombre && nuevoNombre !== nombreCompleto(perfil)) {
+    cambios.Nombres = nuevoNombre;
+    cambios.Apellidos = ''; // el nombre completo va en `Nombres`, igual que en la web
+  }
 
   if (nuevoUsername !== (perfil.Usuario || '')) {
     if (!(await usernameDisponible(nuevoUsername, docId))) {

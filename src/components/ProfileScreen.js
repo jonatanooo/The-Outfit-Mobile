@@ -20,8 +20,11 @@ import {
   extraerTelefono,
   formatearTelefono,
   mensajeErrorAuth,
+  nombreCompleto,
+  normalizarNombre,
   normalizarUsername,
   soloDigitosTelefono,
+  validarNombre,
   validarTelefono,
   validarUsername,
 } from '../lib/authValidation';
@@ -59,19 +62,27 @@ function Dato({ icono, etiqueta, valor }) {
 // Formulario con estado propio; se remonta (key) cada vez que se abre la pantalla.
 function PerfilContenido({ usuario, perfil, onActualizado, onCerrarSesion }) {
   const usernameActual = perfil?.Usuario || usuario.displayName || '';
+  const nombreActual = nombreCompleto(perfil) || usuario.displayName || '';
   const telefonoActual = extraerTelefono(perfil?.Telefono);
+  const [nombre, setNombre] = useState(nombreActual);
   const [username, setUsername] = useState(usernameActual);
   const [telefono, setTelefono] = useState(telefonoActual);
   const [errores, setErrores] = useState({});
   const [exito, setExito] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const usernameRef = useRef(null);
   const telefonoRef = useRef(null);
 
-  const sinCambios = normalizarUsername(username) === usernameActual && telefono === telefonoActual;
+  const sinCambios =
+    normalizarNombre(nombre) === nombreActual &&
+    normalizarUsername(username) === usernameActual &&
+    telefono === telefonoActual;
 
   const guardar = async () => {
     setExito('');
     const nuevos = {};
+    const errNombre = validarNombre(nombre);
+    if (errNombre) nuevos.nombre = errNombre;
     const errUsername = validarUsername(username);
     if (errUsername) nuevos.username = errUsername;
     const errTelefono = validarTelefono(telefono);
@@ -81,8 +92,9 @@ function PerfilContenido({ usuario, perfil, onActualizado, onCerrarSesion }) {
 
     setGuardando(true);
     try {
-      const nuevoPerfil = await actualizarPerfil(usuario, perfil, { username, telefono });
+      const nuevoPerfil = await actualizarPerfil(usuario, perfil, { nombre, username, telefono });
       onActualizado(nuevoPerfil);
+      setNombre(nombreCompleto(nuevoPerfil));
       setUsername(nuevoPerfil.Usuario || '');
       setTelefono(extraerTelefono(nuevoPerfil.Telefono));
       setExito('Cambios guardados');
@@ -93,7 +105,7 @@ function PerfilContenido({ usuario, perfil, onActualizado, onCerrarSesion }) {
     }
   };
 
-  const inicial = (usernameActual || usuario.email || '?').charAt(0).toUpperCase();
+  const inicial = (nombreActual || usernameActual || usuario.email || '?').charAt(0).toUpperCase();
 
   return (
     <View>
@@ -102,15 +114,35 @@ function PerfilContenido({ usuario, perfil, onActualizado, onCerrarSesion }) {
           <Text style={styles.avatarLetra}>{inicial}</Text>
         </View>
         <Text style={styles.avatarNombre} numberOfLines={1}>
-          {usernameActual || 'Sin nombre de usuario'}
+          {nombreActual || usernameActual || 'Sin nombre'}
         </Text>
         {!!telefonoActual && <Text style={styles.avatarTelefono}>+503 {formatearTelefono(telefonoActual)}</Text>}
       </View>
 
       <Text style={styles.seccion}>DATOS PERSONALES</Text>
 
-      <Text style={styles.etiquetaCampo}>NOMBRE DE USUARIO</Text>
+      <Text style={styles.etiquetaCampo}>NOMBRE</Text>
       <TextInput
+        style={[styles.input, !!errores.nombre && styles.inputError]}
+        value={nombre}
+        onChangeText={(v) => {
+          setNombre(v);
+          setErrores((prev) => ({ ...prev, nombre: undefined, general: undefined }));
+          setExito('');
+        }}
+        placeholder="NOMBRE COMPLETO"
+        placeholderTextColor="#9A9A9A"
+        autoCapitalize="words"
+        autoCorrect={false}
+        maxLength={60}
+        returnKeyType="next"
+        onSubmitEditing={() => usernameRef.current?.focus()}
+      />
+      {!!errores.nombre && <Text style={styles.mensajeError}>{errores.nombre}</Text>}
+
+      <Text style={[styles.etiquetaCampo, styles.etiquetaSiguiente]}>NOMBRE DE USUARIO</Text>
+      <TextInput
+        ref={usernameRef}
         style={[styles.input, !!errores.username && styles.inputError]}
         value={username}
         onChangeText={(v) => {

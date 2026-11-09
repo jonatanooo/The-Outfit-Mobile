@@ -53,6 +53,29 @@ export function validarUsername(username) {
   return '';
 }
 
+// ---------- Nombre (el mismo campo `Nombres` que edita la web) ----------
+
+export function normalizarNombre(nombre) {
+  return (nombre || '').trim().replace(/\s+/g, ' ');
+}
+
+// Nombre que se muestra: Nombres + Apellidos del documento User (si los hay).
+export function nombreCompleto(perfil) {
+  return [perfil?.Nombres, perfil?.Apellidos]
+    .map((p) => String(p || '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function validarNombre(nombre) {
+  const valor = normalizarNombre(nombre);
+  if (!valor) return 'El nombre es obligatorio';
+  if (valor.length < 2) return 'Mínimo 2 caracteres';
+  if (valor.length > 60) return 'Máximo 60 caracteres';
+  if (!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$/.test(valor)) return 'Solo letras y espacios';
+  return '';
+}
+
 // ---------- Teléfono (El Salvador: +503 y 8 dígitos) ----------
 
 // Deja solo dígitos y limita a 8.
