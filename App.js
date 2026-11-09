@@ -15,6 +15,7 @@ import {
   Modal,
   Alert,
   TextInput,
+  AppState,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
@@ -470,31 +471,48 @@ function MainHomeScreen() {
     }
   };
 
-  // 1. Consulta a Firebase Firestore para la ropa (Nuevos Ingresos por género)
+  // 1. Consulta a Firebase Firestore para la ropa (Nuevos Ingresos por género).
+  // Se carga al abrir la app y se refresca al volver a ella (como mucho una vez por minuto), para
+  // que los cambios hechos en la web (precios, stock, prendas nuevas) se vean sin reiniciarla.
+  const ultimaCargaCatalogo = useRef(0);
+  const cargandoCatalogo = useRef(false);
   useEffect(() => {
     let montado = true;
 
-    async function cargarCatalogo() {
+    async function cargarCatalogo(silencioso) {
+      if (cargandoCatalogo.current) return;
+      cargandoCatalogo.current = true;
       try {
-        setCargandoProductos(true);
+        if (!silencioso) setCargandoProductos(true);
         const { mujer, hombre } = await obtenerNuevosIngresosPorGenero();
-        if (montado) {
+        // Si la consulta falla devuelve listas vacías: en un refresco se conserva lo que ya hay.
+        const hayDatos = mujer.length + hombre.length > 0;
+        if (montado && (hayDatos || !silencioso)) {
           setProductosMujer(mujer);
           setProductosHombre(hombre);
+          if (hayDatos) ultimaCargaCatalogo.current = Date.now();
         }
       } catch (err) {
         console.error('Error cargando nuevos ingresos desde Firebase:', err);
       } finally {
-        if (montado) {
+        cargandoCatalogo.current = false;
+        if (montado && !silencioso) {
           setCargandoProductos(false);
         }
       }
     }
 
-    cargarCatalogo();
+    cargarCatalogo(false);
+
+    const suscripcion = AppState.addEventListener('change', (estado) => {
+      if (estado === 'active' && Date.now() - ultimaCargaCatalogo.current > 60000) {
+        cargarCatalogo(true);
+      }
+    });
 
     return () => {
       montado = false;
+      suscripcion.remove();
     };
   }, []);
 
