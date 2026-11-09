@@ -21,6 +21,9 @@ export function CarritoProvider({ children }) {
   const [items, setItems] = useState([]);
   const [cargado, setCargado] = useState(false);
   const itemsRef = useRef([]);
+  // Con sesión, la cesta se guarda también en Firestore (la comparte con la web). La pantalla que
+  // conoce al usuario registra aquí la función que escribe cada cambio.
+  const sincronizadorRef = useRef(null);
 
   const aplicar = useCallback((nuevos) => {
     itemsRef.current = nuevos;
@@ -55,6 +58,7 @@ export function CarritoProvider({ children }) {
         return { ok: false, mensaje: `Solo hay ${variante.stock} unidades disponibles de esta talla.` };
       }
 
+      sincronizadorRef.current?.({ tipo: 'fijar', idVariante: variante.id, cantidad: nuevaCantidad });
       if (existente) {
         aplicar(actual.map((i) => (i === existente ? { ...i, cantidad: nuevaCantidad } : i)));
       } else {
@@ -90,29 +94,51 @@ export function CarritoProvider({ children }) {
       if (!item) return { ok: false, mensaje: '' };
       if (cantidad <= 0) {
         aplicar(actual.filter((i) => i !== item));
+        sincronizadorRef.current?.({ tipo: 'fijar', idVariante, cantidad: 0 });
         return { ok: true, mensaje: '' };
       }
       if (item.stockDisponible != null && cantidad > item.stockDisponible) {
         return { ok: false, mensaje: `Solo hay ${item.stockDisponible} unidades disponibles de esta talla.` };
       }
       aplicar(actual.map((i) => (i === item ? { ...i, cantidad } : i)));
+      sincronizadorRef.current?.({ tipo: 'fijar', idVariante, cantidad });
       return { ok: true, mensaje: '' };
     },
     [aplicar]
   );
 
-  const vaciar = useCallback(() => aplicar([]), [aplicar]);
+  const vaciar = useCallback(() => {
+    aplicar([]);
+    sincronizadorRef.current?.({ tipo: 'vaciar' });
+  }, [aplicar]);
+
+  // Registra (o quita, con null) la función que guarda los cambios de la cesta en Firestore.
+  const registrarSincronizador = useCallback((funcion) => {
+    sincronizadorRef.current = funcion;
+  }, []);
+
+  // Reemplaza la cesta con lo que llega de Firestore. No vuelve a escribir en Firestore.
+  const reemplazarItems = useCallback((nuevos) => aplicar((nuevos || []).filter(itemValido)), [aplicar]);
 
   // Pone al día los artículos de la cesta con los datos vigentes de cada variante:
   // lista de { idVariante, precio, precioOriginal, enOferta, porcentajeDescuento, stock? }.
   // Así la cesta nunca muestra el precio de una oferta que ya venció. Solo cambia (y vuelve a
   // dibujar) si algún dato es distinto.
+  // Con { quitarAusentes: true } (cuando `vigentes` es el catálogo completo) se quitan las prendas que ya
+  // no existen o se agotaron, como hace la web con su cesta.
   const actualizarPrecios = useCallback(
-    (vigentes) => {
+    (vigentes, { quitarAusentes = false } = {}) => {
       if (!Array.isArray(vigentes) || vigentes.length === 0) return;
       const porVariante = new Map(vigentes.map((v) => [String(v.idVariante), v]));
       let hayCambios = false;
-      const nuevos = itemsRef.current.map((item) => {
+      const conservados = quitarAusentes
+        ? itemsRef.current.filter((item) => {
+            const v = porVariante.get(String(item.idVariante));
+            return v && !(v.stock != null && !(v.stock > 0));
+          })
+        : itemsRef.current;
+      if (conservados.length !== itemsRef.current.length) hayCambios = true;
+      const nuevos = conservados.map((item) => {
         const v = porVariante.get(String(item.idVariante));
         if (!v) return item;
         const siguiente = {
@@ -152,8 +178,10 @@ export function CarritoProvider({ children }) {
       cambiarCantidad,
       vaciar,
       actualizarPrecios,
+      registrarSincronizador,
+      reemplazarItems,
     };
-  }, [items, cargado, agregar, cambiarCantidad, vaciar, actualizarPrecios]);
+  }, [items, cargado, agregar, cambiarCantidad, vaciar, actualizarPrecios, registrarSincronizador, reemplazarItems]);
 
   return <CarritoContext.Provider value={valor}>{children}</CarritoContext.Provider>;
 }
