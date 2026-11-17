@@ -470,10 +470,25 @@ function MainHomeScreen() {
   };
 
   // Estados para la Vista de Detalles del Producto (PDP Modal)
-  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [productoBase, setProductoSeleccionado] = useState(null);
+  // La prenda abierta se muestra siempre con los datos más recientes del catálogo: si este se
+  // recarga (jalar para actualizar), cambian al instante el precio, la oferta, las tallas y las fotos.
+  const productoSeleccionado = useMemo(() => {
+    if (!productoBase) return null;
+    return (
+      [...productosMujer, ...productosHombre].find((p) => String(p.id) === String(productoBase.id)) ||
+      productoBase
+    );
+  }, [productoBase, productosMujer, productosHombre]);
   const [pdpVisible, setPdpVisible] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [tallaSeleccionada, setTallaSeleccionada] = useState(null);
+  const [tallaElegida, setTallaSeleccionada] = useState(null);
+  // Si tras actualizar la talla elegida ya no existe, se usa la primera disponible.
+  const tallaSeleccionada = productoSeleccionado
+    ? (productoSeleccionado.tallas || []).includes(tallaElegida)
+      ? tallaElegida
+      : (productoSeleccionado.tallas || [])[0] ?? null
+    : null;
   const [acordeonAbierto, setAcordeonAbierto] = useState(null);
   const pdpScrollRef = useRef(null);
   const mainScrollRef = useRef(null);
@@ -1244,6 +1259,7 @@ function MainHomeScreen() {
 
             <ScrollView
               ref={pdpScrollRef}
+              refreshControl={controlRefresco}
               style={styles.pdpScrollView}
               contentContainerStyle={styles.pdpScrollContent}
               showsVerticalScrollIndicator={false}
