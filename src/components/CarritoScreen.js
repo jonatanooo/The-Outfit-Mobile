@@ -7,7 +7,6 @@ import {
   Image,
   StyleSheet,
   Modal,
-  Alert,
   StatusBar,
   useWindowDimensions,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import CustomBottomTabBar from './CustomBottomTabBar';
 import { ID_CATEGORIA_HOMBRE, ID_CATEGORIA_MUJER } from '../lib/productos';
 import { formatoPrecio } from '../lib/tienda';
+import { mostrarAlerta, mostrarConfirmacion } from '../lib/alertas';
 
 const FONT = 'Instrument Sans SemiBold';
 const FILTROS = { TODOS: null, MUJER: ID_CATEGORIA_MUJER, HOMBRE: ID_CATEGORIA_HOMBRE };
@@ -26,15 +26,18 @@ function TarjetaPrenda({ item, ancho, esFavorito, onToggleFavorito, onAbrirProdu
       onCambiarCantidad(item.idVariante, item.cantidad - 1);
       return;
     }
-    Alert.alert('Quitar de la cesta', `¿Quitar "${item.nombre}" de tu cesta?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Quitar', style: 'destructive', onPress: () => onCambiarCantidad(item.idVariante, 0) },
-    ]);
+    mostrarConfirmacion({
+      titulo: 'Quitar de la cesta',
+      mensaje: `¿Quitar "${item.nombre}" de tu cesta?`,
+      textoConfirmar: 'Quitar',
+    }).then((quitar) => {
+      if (quitar) onCambiarCantidad(item.idVariante, 0);
+    });
   };
 
   const sumar = () => {
     const resultado = onCambiarCantidad(item.idVariante, item.cantidad + 1);
-    if (resultado && !resultado.ok && resultado.mensaje) Alert.alert('Stock limitado', resultado.mensaje);
+    if (resultado && !resultado.ok && resultado.mensaje) mostrarAlerta({ titulo: 'Stock limitado', tipo: 'aviso', mensaje: resultado.mensaje });
   };
 
   return (

@@ -13,7 +13,6 @@ import {
   Platform,
   StatusBar,
   Modal,
-  Alert,
   TextInput,
   AppState,
 } from 'react-native';
@@ -23,6 +22,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import HistorialScreen from './src/app/historial';
+import AlertaProvider from './src/components/MensajeEmergente';
+import { mostrarAlerta, mostrarConfirmacion } from './src/lib/alertas';
 import { obtenerNuevosIngresosPorGenero } from './src/lib/productos';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebaseClient';
@@ -93,7 +94,7 @@ function MainHomeScreen() {
     );
 
     if (tallasValidas.length === 0) {
-      Alert.alert('No disponible', 'No hay tallas disponibles por el momento para esta prenda.');
+      mostrarAlerta({ titulo: 'No disponible', tipo: 'aviso', mensaje: 'No hay tallas disponibles por el momento para esta prenda.' });
       return;
     }
 
@@ -307,7 +308,7 @@ function MainHomeScreen() {
       setActiveTab('home');
     }
     if (opciones.registro) {
-      Alert.alert('¡Cuenta creada!', 'Tu cuenta se creó con éxito. Bienvenido a The Outfit.');
+      mostrarAlerta({ titulo: '¡Cuenta creada!', tipo: 'exito', mensaje: 'Tu cuenta se creó con éxito. Bienvenido a The Outfit.' });
     }
   };
 
@@ -389,20 +390,21 @@ function MainHomeScreen() {
   const agregarAlCarrito = (producto, talla) => {
     const resultado = carrito.agregar(producto, elegirVariante(producto, talla));
     if (!resultado.ok) {
-      Alert.alert('No se pudo añadir', resultado.mensaje);
+      mostrarAlerta({ titulo: 'Disponibilidad de stock', tipo: 'aviso', mensaje: resultado.mensaje });
       return;
     }
-    Alert.alert('Añadido a la cesta', `${producto.nombre} (${talla})`, [
-      { text: 'Seguir comprando', style: 'cancel' },
-      {
-        text: 'Ver cesta',
-        onPress: () => {
-          if (pdpVisible) cerrarDetalleProducto();
-          if (favoritosVisible) cerrarFavoritos();
-          setTimeout(abrirCarrito, 350);
-        },
-      },
-    ]);
+    mostrarConfirmacion({
+      titulo: '¡Agregado a tu cesta!',
+      tipo: 'exito',
+      mensaje: `${producto.nombre} (${talla})`,
+      textoConfirmar: 'Ver cesta',
+      textoCancelar: 'Seguir comprando',
+    }).then((verCesta) => {
+      if (!verCesta) return;
+      if (pdpVisible) cerrarDetalleProducto();
+      if (favoritosVisible) cerrarFavoritos();
+      setTimeout(abrirCarrito, 350);
+    });
   };
 
   // Desde favoritos: si hay una sola talla se añade directo; si no, se abre la ficha para elegirla
@@ -411,7 +413,7 @@ function MainHomeScreen() {
       (t) => t && !/^(única|unica|talla\s*única|talla\s*unica)$/i.test(String(t).trim())
     );
     if (tallasValidas.length === 1) agregarAlCarrito(producto, tallasValidas[0]);
-    else if (tallasValidas.length === 0) Alert.alert('No disponible', 'No hay tallas disponibles por el momento.');
+    else if (tallasValidas.length === 0) mostrarAlerta({ titulo: 'No disponible', tipo: 'aviso', mensaje: 'No hay tallas disponibles por el momento.' });
     else abrirDetalleProducto(producto);
   };
 
@@ -453,7 +455,7 @@ function MainHomeScreen() {
       } catch (err) {
         console.warn('No se pudo guardar el favorito en Firestore:', err?.code || err);
         aplicar(existe); // se deshace para no mostrar algo que no quedó guardado
-        Alert.alert('Favoritos', 'No se pudo guardar el favorito. Revisa tu conexión e inténtalo de nuevo.');
+        mostrarAlerta({ titulo: 'Favoritos', tipo: 'favoritos', mensaje: 'No se pudo guardar el favorito. Revisa tu conexión e inténtalo de nuevo.' });
       }
     }
   };
@@ -1378,10 +1380,7 @@ function MainHomeScreen() {
                   disabled={!tieneTallasPdp}
                   onPress={() => {
                     if (!tieneTallasPdp || !tallaSeleccionada) {
-                      Alert.alert(
-                        'No disponible',
-                        'No hay tallas disponibles por el momento.'
-                      );
+                      mostrarAlerta({ titulo: 'No disponible', tipo: 'aviso', mensaje: 'No hay tallas disponibles por el momento.' });
                       return;
                     }
                     agregarAlCarrito(productoSeleccionado, tallaSeleccionada);
@@ -2230,7 +2229,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <CarritoProvider>
-        <MainHomeScreen />
+        <AlertaProvider>
+          <MainHomeScreen />
+        </AlertaProvider>
       </CarritoProvider>
     </SafeAreaProvider>
   );
