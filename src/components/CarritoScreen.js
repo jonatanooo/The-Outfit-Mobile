@@ -97,6 +97,7 @@ export default function CarritoModal({
   onToggleFavorito,
   onAbrirProducto,
   onContinuar,
+  refreshControl, // control de "jalar para actualizar" (lo pasa la app)
 }) {
   const { width } = useWindowDimensions();
   const ancho = width / 2;
@@ -145,6 +146,7 @@ export default function CarritoModal({
         </View>
 
         <FlatList
+          refreshControl={refreshControl}
           style={styles.lista}
           data={visibles}
           keyExtractor={(item) => `cesta-${item.idVariante}`}

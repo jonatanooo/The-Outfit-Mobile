@@ -15,6 +15,7 @@ import {
   Modal,
   TextInput,
   AppState,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans';
@@ -548,6 +549,7 @@ function MainHomeScreen() {
   // Se carga al abrir la app y se refresca al volver a ella (como mucho una vez por minuto), para
   // que los cambios hechos en la web (precios, stock, prendas nuevas) se vean sin reiniciarla.
   const ultimaCargaCatalogo = useRef(0);
+  const recargarCatalogoRef = useRef(null);
   const cargandoCatalogo = useRef(false);
   useEffect(() => {
     let montado = true;
@@ -576,6 +578,8 @@ function MainHomeScreen() {
     }
 
     cargarCatalogo(false);
+    // Para "jalar para actualizar": recarga sin esperar el minuto y sin tapar la pantalla.
+    recargarCatalogoRef.current = () => cargarCatalogo(true);
 
     const suscripcion = AppState.addEventListener('change', (estado) => {
       if (estado === 'active' && Date.now() - ultimaCargaCatalogo.current > 60000) {
@@ -588,6 +592,25 @@ function MainHomeScreen() {
       suscripcion.remove();
     };
   }, []);
+
+  // "Jalar para actualizar": recarga el catálogo (precios, stock, prendas) y el perfil.
+  // La cesta y los favoritos ya se escuchan en tiempo real.
+  const [refrescando, setRefrescando] = useState(false);
+  const refrescarTodo = async () => {
+    if (refrescando) return;
+    setRefrescando(true);
+    try {
+      await Promise.all([
+        recargarCatalogoRef.current?.(),
+        usuario ? buscarPerfil(usuario).then(setPerfilUsuario).catch(() => {}) : null,
+      ]);
+    } finally {
+      setRefrescando(false);
+    }
+  };
+  const controlRefresco = (
+    <RefreshControl refreshing={refrescando} onRefresh={refrescarTodo} tintColor="#000000" colors={['#000000']} />
+  );
 
   // Convierte las líneas de la cesta de Firestore en artículos, con los datos actuales del catálogo.
   useEffect(() => {
@@ -984,6 +1007,7 @@ function MainHomeScreen() {
             </View>
           ) : (
             <FlatList
+              refreshControl={controlRefresco}
               data={textoBusqueda.trim().length > 0 ? resultadosBusqueda : productosRecomendados}
               keyExtractor={(item) => `search-prod-${item.id}`}
               numColumns={2}
@@ -1039,6 +1063,7 @@ function MainHomeScreen() {
         /* ScrollView Principal (HOME) */
         <ScrollView
           ref={mainScrollRef}
+          refreshControl={controlRefresco}
           style={styles.scrollView}
           contentContainerStyle={[
             styles.scrollContent,
@@ -1681,6 +1706,7 @@ function MainHomeScreen() {
        </View>
         ) : (
        <CatalogoCategorias
+      refreshControl={controlRefresco}
       productosMujer={productosMujer}
       productosHombre={productosHombre}
       generoSeleccionado={generoMenuTab}
@@ -1832,6 +1858,7 @@ function MainHomeScreen() {
 
           {/* 3. Cuadrícula dinámica de 2 columnas con FlatList */}
           <FlatList
+            refreshControl={controlRefresco}
             data={favoritosFiltrados}
             keyExtractor={(item) => `fav-${item.id}`}
             numColumns={2}
@@ -2042,6 +2069,7 @@ function MainHomeScreen() {
 
       {/* Cesta y proceso de compra */}
       <CarritoModal
+        refreshControl={controlRefresco}
         visible={carritoVisible}
         items={carrito.items}
         subtotal={carrito.subtotal}
@@ -2068,6 +2096,7 @@ function MainHomeScreen() {
 
       {/* Pantalla de perfil del usuario */}
       <ProfileModal
+        refreshControl={controlRefresco}
         visible={perfilVisible && !!usuario}
         usuario={usuario}
         perfil={perfilUsuario}
