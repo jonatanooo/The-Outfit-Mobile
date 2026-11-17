@@ -200,7 +200,7 @@ export async function obtenerNuevosIngresosPorGenero() {
         idGenero: idPadre,
         idTemporada: p.ID_Temporada != null ? Number(p.ID_Temporada) : null,
         esWinterSeason: esWinterSeason(p, catPorId[String(catId)], temporadasPorId),
-        referencia: p.Referencia || String(pid).padStart(9, '7'),
+        referencia: p.Referencia || String(pid),
       };
 
       if (idPadre === ID_CATEGORIA_MUJER) {
