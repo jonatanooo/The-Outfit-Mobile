@@ -9,6 +9,16 @@ import { TIENDA_DIRECCION } from '../lib/tienda';
 const IMAGEN_VACIA = 'https://via.placeholder.com/100';
 const dinero = (n: any) => `$${Number(n || 0).toFixed(2)}`;
 
+// En la BD un mismo ID puede estar guardado como número o como texto: se prueban las dos formas.
+const variantesDeId = (id: any) => {
+  const formas: any[] = [id];
+  if (id !== null && id !== undefined && id !== '') {
+    if (!Number.isNaN(Number(id))) formas.push(Number(id));
+    formas.push(String(id));
+  }
+  return [...new Set(formas)];
+};
+
 // Los catálogos pequeños (tallas, colores) se leen una sola vez para todos los pedidos.
 async function cargarCatalogos() {
   const [tallaSnap, tiposSnap, colorSnap] = await Promise.all([
@@ -37,6 +47,7 @@ async function cargarCatalogos() {
 // Un artículo del pedido: nombre, foto, talla/color, cantidad y precios.
 async function cargarArticulo(detalle: any, catalogos: any) {
   const articulo = {
+    codigo: String(detalle.ID_Variante ?? ''),
     nombre: `Artículo #${detalle.ID_Variante}`,
     imagen: IMAGEN_VACIA,
     talla: '',
@@ -47,7 +58,7 @@ async function cargarArticulo(detalle: any, catalogos: any) {
   };
 
   try {
-    const varSnap = await getDocs(query(collection(db, 'Variante_Producto'), where('ID_Variante', '==', detalle.ID_Variante)));
+    const varSnap = await getDocs(query(collection(db, 'Variante_Producto'), where('ID_Variante', 'in', variantesDeId(detalle.ID_Variante))));
     if (varSnap.empty) return articulo;
     const variante = varSnap.docs[0].data();
     articulo.talla = catalogos.tallas[String(variante.ID_Talla)] || '';
@@ -55,8 +66,8 @@ async function cargarArticulo(detalle: any, catalogos: any) {
 
     const idProducto = variante.ID_Producto;
     const [prodSnap, fotosSnap] = await Promise.all([
-      getDocs(query(collection(db, 'Productos'), where('ID_Producto', '==', idProducto))),
-      getDocs(query(collection(db, 'Fotos_Productos'), where('ID_Producto', '==', Number(idProducto)))),
+      getDocs(query(collection(db, 'Productos'), where('ID_Producto', 'in', variantesDeId(idProducto)))),
+      getDocs(query(collection(db, 'Fotos_Productos'), where('ID_Producto', 'in', variantesDeId(idProducto)))),
     ]);
     if (!prodSnap.empty) articulo.nombre = prodSnap.docs[0].data().Nombre_Producto || articulo.nombre;
     if (!fotosSnap.empty) {
@@ -189,6 +200,7 @@ export default function HistorialScreen({ onVolver }: { onVolver?: () => void })
                 <Image source={{ uri: a.imagen }} style={styles.imagenArticulo} />
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.nombreArticulo}>{a.nombre}</Text>
+                  {a.codigo ? <Text style={styles.detalleArticulo}>Código #{a.codigo}</Text> : null}
                   {(a.talla || a.color) ? (
                     <Text style={styles.detalleArticulo}>{[a.talla && `Talla ${a.talla}`, a.color].filter(Boolean).join(' · ')}</Text>
                   ) : null}
