@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Modal,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import CustomBottomTabBar from './CustomBottomTabBar';
 import { useKeyboardVisible } from '../hooks/use-keyboard-visible';
+import { mostrarAlerta } from '../lib/alertas';
 import {
   evaluarPassword,
   mensajeErrorAuth,
@@ -154,10 +154,11 @@ function LoginForm({ onCambiarModo, onAutenticado }) {
     setErrores({});
     try {
       await recuperarPassword(correo);
-      Alert.alert(
-        'Revisa tu correo',
-        'Si ese correo tiene una cuenta, te enviamos un enlace para restablecer la contraseña.'
-      );
+      mostrarAlerta({
+        titulo: 'Revisa tu correo',
+        tipo: 'exito',
+        mensaje: 'Si ese correo tiene una cuenta, te enviamos un enlace para restablecer la contraseña.',
+      });
     } catch (e) {
       setErrores({ general: mensajeDeError(e) });
     }
@@ -291,7 +292,7 @@ function RegisterForm({ onCambiarModo, onAutenticado }) {
   };
 
   const verTerminos = () =>
-    Alert.alert('Términos y condiciones', 'El documento completo estará disponible próximamente.');
+    mostrarAlerta({ titulo: 'Términos y condiciones', mensaje: 'El documento completo estará disponible próximamente.' });
 
   return (
     <View>
