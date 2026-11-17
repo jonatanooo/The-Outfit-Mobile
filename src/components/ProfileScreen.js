@@ -212,7 +212,7 @@ function PerfilContenido({ usuario, perfil, onActualizado, onCerrarSesion }) {
   );
 }
 
-export default function ProfileModal({ visible, usuario, perfil, onCerrar, onNavegar, onActualizado, onCerrarSesion }) {
+export default function ProfileModal({ visible, usuario, perfil, onCerrar, onNavegar, onActualizado, onCerrarSesion, refreshControl }) {
   const tecladoVisible = useKeyboardVisible();
 
   return (
@@ -226,6 +226,7 @@ export default function ProfileModal({ visible, usuario, perfil, onCerrar, onNav
 
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
+            refreshControl={refreshControl}
             style={styles.flex}
             contentContainerStyle={styles.contenido}
             keyboardShouldPersistTaps="handled"

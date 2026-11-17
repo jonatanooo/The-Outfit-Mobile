@@ -43,6 +43,7 @@ export default function CatalogoCategorias({
   iniciarEnColeccion = null, // { coleccion: 'ofertas' | 'invierno', genero: 'mujer' | 'hombre' | null }
   esFavorito,
   onToggleFavorito,
+  refreshControl, // control de "jalar para actualizar" (lo pasa la app)
 }) {
   const [generoLocal, setGeneroLocal] = useState('mujer');
 
@@ -339,6 +340,7 @@ useEffect(() => {
 
   // Lista vertical de categorías como en Figma
   <ScrollView
+    refreshControl={refreshControl}
     style={styles.listaCategorias}
     contentContainerStyle={{ paddingBottom: paddingInferior }}
     showsVerticalScrollIndicator={false}
@@ -436,6 +438,7 @@ useEffect(() => {
     />
 
     <ListadoPrendas
+      refreshControl={refreshControl}
       productos={productosFiltrados}
       paddingInferior={paddingInferior}
       mensajeVacio={

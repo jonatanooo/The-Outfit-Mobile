@@ -16,6 +16,7 @@ export default function ListadoPrendas({
   onToggleFavorito,
   paddingInferior = 12, // espacio al final para que la barra inferior no tape la última fila
   mensajeVacio = 'No hay prendas para mostrar.',
+  refreshControl,
 }) {
   const renderPrenda = ({ item }) => {
     const enOferta = item.enOferta && Number(item.porcentajeDescuento) > 0;
@@ -90,6 +91,7 @@ export default function ListadoPrendas({
 
   return (
     <FlatList
+      refreshControl={refreshControl}
       data={productos}
       keyExtractor={(item) => String(item.id)}
       renderItem={renderPrenda}

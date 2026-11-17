@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../firebase'; // archivo de conexión
 import { textoDireccion } from '../lib/pedidos';
 import { TIENDA_DIRECCION } from '../lib/tienda';
@@ -142,39 +142,54 @@ export default function HistorialScreen({ onVolver }: { onVolver?: () => void })
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
 
+  const [refrescando, setRefrescando] = useState(false);
+  const usuarioActual = useRef<any>(null);
+
+  // Lee los pedidos del usuario. Si falla, conserva la lista que ya se veía.
+  const cargarPedidos = async (user: any) => {
+    try {
+      // 1. Obtener el ID_User del usuario logueado (buscando en la colección User)
+      const qUser = query(collection(db, 'User'), where('auth_id', '==', user.uid));
+      const userSnap = await getDocs(qUser);
+
+      if (!userSnap.empty) {
+        const perfil = userSnap.docs[0].data();
+        const correo = perfil.Correo || user.email || '';
+
+        // 2. Buscar los pedidos de ese usuario
+        const qPedidos = query(collection(db, 'Pedido'), where('ID_User', '==', perfil.ID_User));
+        const [pedidosSnap, catalogos] = await Promise.all([getDocs(qPedidos), cargarCatalogos()]);
+
+        const lista = await Promise.all(pedidosSnap.docs.map((d) => cargarPedido(d.data(), catalogos, correo)));
+        lista.sort((a, b) => Number(b.id) - Number(a.id)); // más reciente primero
+        setPedidos(lista);
+      }
+    } catch (error) {
+      console.error('Error cargando pedidos:', error);
+    }
+  };
+
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, async (user) => {
+      usuarioActual.current = user;
       if (!user) {
         setCargando(false);
         return;
       }
-
-      try {
-        // 1. Obtener el ID_User del usuario logueado (buscando en la colección User)
-        const qUser = query(collection(db, 'User'), where('auth_id', '==', user.uid));
-        const userSnap = await getDocs(qUser);
-
-        if (!userSnap.empty) {
-          const perfil = userSnap.docs[0].data();
-          const correo = perfil.Correo || user.email || '';
-
-          // 2. Buscar los pedidos de ese usuario
-          const qPedidos = query(collection(db, 'Pedido'), where('ID_User', '==', perfil.ID_User));
-          const [pedidosSnap, catalogos] = await Promise.all([getDocs(qPedidos), cargarCatalogos()]);
-
-          const lista = await Promise.all(pedidosSnap.docs.map((d) => cargarPedido(d.data(), catalogos, correo)));
-          lista.sort((a, b) => Number(b.id) - Number(a.id)); // más reciente primero
-          setPedidos(lista);
-        }
-      } catch (error) {
-        console.error('Error cargando pedidos:', error);
-      } finally {
-        setCargando(false);
-      }
+      await cargarPedidos(user);
+      setCargando(false);
     });
 
     return () => cancelar();
   }, []);
+
+  // "Jalar para actualizar": vuelve a leer los pedidos (por ejemplo, cambios de estado hechos en la web).
+  const refrescar = async () => {
+    if (!usuarioActual.current || refrescando) return;
+    setRefrescando(true);
+    await cargarPedidos(usuarioActual.current);
+    setRefrescando(false);
+  };
 
   // --- VISTA DE DETALLE ---
   if (pedidoSeleccionado) {
@@ -262,10 +277,14 @@ export default function HistorialScreen({ onVolver }: { onVolver?: () => void })
         <View style={styles.cargando}>
           <ActivityIndicator size="large" color="#000" />
         </View>
-      ) : pedidos.length === 0 ? (
-        <Text style={{ textAlign: 'center', marginTop: 50, color: '#666' }}>No tienes compras aún.</Text>
       ) : (
-        <ScrollView style={styles.listaContainer}>
+        <ScrollView
+          style={styles.listaContainer}
+          refreshControl={<RefreshControl refreshing={refrescando} onRefresh={refrescar} tintColor="#000000" colors={['#000000']} />}
+        >
+          {pedidos.length === 0 && (
+            <Text style={{ textAlign: 'center', marginTop: 50, color: '#666' }}>No tienes compras aún.</Text>
+          )}
           {pedidos.map((pedido) => (
             <TouchableOpacity
               key={pedido.id}
