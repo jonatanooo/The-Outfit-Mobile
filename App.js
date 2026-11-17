@@ -2015,7 +2015,8 @@ function MainHomeScreen() {
             />
           </View>
           
-          <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          {/* La barra ocupa su lugar en el layout: el historial termina justo encima y nada queda tapado. */}
+          <View style={[styles.bottomTabBar, { position: 'relative', paddingBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.tabButtonsContainer}>
               {NAV_TABS.map((tab) => {
                 const isSelected = activeTab === tab.id;
