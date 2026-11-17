@@ -247,7 +247,9 @@ export default function HistorialScreen({ onVolver }: { onVolver?: () => void })
       </View>
 
       {cargando ? (
-        <ActivityIndicator size="large" color="#000" style={{ marginTop: 50 }} />
+        <View style={styles.cargando}>
+          <ActivityIndicator size="large" color="#000" />
+        </View>
       ) : pedidos.length === 0 ? (
         <Text style={{ textAlign: 'center', marginTop: 50, color: '#666' }}>No tienes compras aún.</Text>
       ) : (
@@ -284,6 +286,7 @@ const styles = StyleSheet.create({
   botonVolver: { position: 'absolute', left: 8, top: 0, bottom: 0, width: 44, alignItems: 'center', justifyContent: 'center' },
   flechaVolver: { fontSize: 26, color: '#000' },
   titulo: { fontSize: 20, fontWeight: 'bold', letterSpacing: 2, color: '#000' },
+  cargando: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listaContainer: { padding: 20 },
   tarjetaPedido: { flexDirection: 'row', alignItems: 'center', marginBottom: 25, justifyContent: 'space-between' },
   imagenProducto: { width: 70, height: 90, backgroundColor: '#f5f5f5', borderRadius: 8 },

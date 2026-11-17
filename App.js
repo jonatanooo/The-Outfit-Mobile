@@ -1677,7 +1677,9 @@ function MainHomeScreen() {
         {/* 4. Catálogo y filtros - Persona 2 */}
        <View style={styles.menuEmptyContent}>
         {cargandoProductos ? (
-       <ActivityIndicator size="large" color="#000000" />
+       <View style={styles.menuCargando}>
+         <ActivityIndicator size="large" color="#000000" />
+       </View>
         ) : (
        <CatalogoCategorias
       productosMujer={productosMujer}
@@ -2872,6 +2874,12 @@ const styles = StyleSheet.create({
   menuEmptyContent: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  // Carga centrada en el espacio libre, por encima de la barra inferior.
+  menuCargando: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // 9. Estilos de la Vista de Favoritos
