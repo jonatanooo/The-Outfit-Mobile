@@ -8,6 +8,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -101,6 +102,7 @@ function CheckoutContenido({
     const entrada = validarRef.current?.();
     if (!entrada) return;
 
+    Keyboard.dismiss();
     setProcesando(true);
     setErrorPago('');
     try {
@@ -183,12 +185,16 @@ function CheckoutContenido({
 
         {!tecladoVisible && <CustomBottomTabBar activeTab="cesta" onTabPress={onNavegar} enFlujo />}
 
-        {procesando && (
-          <View style={styles.overlay} pointerEvents="auto">
-            <ActivityIndicator size="large" color={NEGRO} />
-            <Text style={styles.overlayTexto}>PROCESANDO PAGO...</Text>
+        {/* Modal propio: siempre cubre toda la pantalla, sin depender del layout ni del teclado. */}
+        <Modal visible={procesando} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+          <View style={styles.overlay}>
+            <View style={styles.tarjetaCarga}>
+              <ActivityIndicator size="large" color={NEGRO} />
+              <Text style={styles.overlayTexto}>PROCESANDO PAGO</Text>
+              <Text style={styles.overlaySub}>Un momento, no cierres la app.</Text>
+            </View>
           </View>
-        )}
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
@@ -220,13 +226,22 @@ const styles = StyleSheet.create({
   },
   botonInicioTexto: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: '#FFFFFF' },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
-    // Por encima de la barra inferior (que en Android tiene elevación): la carga cubre toda la pantalla.
-    zIndex: 100,
-    elevation: 100,
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    flex: 1,
+    backgroundColor: 'rgba(15,10,10,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 24,
   },
-  overlayTexto: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.5, color: NEGRO, marginTop: 14 },
+  tarjetaCarga: {
+    width: '100%',
+    maxWidth: 300,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    elevation: 12,
+  },
+  overlayTexto: { fontFamily: FONT, fontSize: 14, letterSpacing: 1.5, color: NEGRO, marginTop: 18 },
+  overlaySub: { fontSize: 12, color: '#525252', marginTop: 6, textAlign: 'center' },
 });
