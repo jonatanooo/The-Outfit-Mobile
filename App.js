@@ -1316,7 +1316,7 @@ function MainHomeScreen() {
                     )}
 
                     <Text style={styles.pdpReference}>
-                      REF #{productoSeleccionado.referencia || productoSeleccionado.id}
+                      REF #{elegirVariante(productoSeleccionado, tallaSeleccionada)?.id ?? productoSeleccionado.referencia ?? productoSeleccionado.id}
                     </Text>
                   </View>
 
