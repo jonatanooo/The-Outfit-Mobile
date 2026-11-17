@@ -221,6 +221,9 @@ const styles = StyleSheet.create({
   botonInicioTexto: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: '#FFFFFF' },
   overlay: {
     ...StyleSheet.absoluteFillObject,
+    // Por encima de la barra inferior (que en Android tiene elevación): la carga cubre toda la pantalla.
+    zIndex: 100,
+    elevation: 100,
     backgroundColor: 'rgba(255,255,255,0.88)',
     alignItems: 'center',
     justifyContent: 'center',
